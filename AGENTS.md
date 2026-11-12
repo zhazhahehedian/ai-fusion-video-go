@@ -34,13 +34,13 @@
 
 ## Go 后端
 
-- 技术栈固定：**chi**（HTTP）、**sqlc**（数据访问）、**goose**（迁移）、**go-redis**（缓存/会话/锁/唤醒）、标准库 `database/sql`。禁止再引入第二套 Web 框架或 ORM（如 gin、gorm）替代上述选择。
+- 技术栈：**chi**（HTTP）、**sqlc** + `database/sql`、**goose**、**MySQL 8**、**go-redis**。异步任务用 MySQL 租约队列（对齐融光语义）。非必要不引入第二套 Web 框架或 ORM（如 gin、gorm）。
 - API 响应与原 Java 版对齐：`{code,msg,data}`，成功 `code=0`；分页 `{list,total}`；分页参数 `pageNo` / `pageSize`。
 - 请求上下文：用 `context.Context` 传递截止时间、取消与当前会话；中间件把会话写入 context，下游用显式取值函数读取。禁止用全局可变“当前用户”。
 - 数据库事务只覆盖必要的状态、权限、版本和租约校验及写入；文件传输、加解密、对象存储与外部网络请求不得持有数据库事务或行锁。用 `WithTx(ctx, fn)` 一类辅助函数管理 `BeginTx` + `Rollback`/`Commit`。
 - 业务 SQL 手写在 `db/queries/`，由 sqlc 生成类型安全代码；禁止在 Service 里拼接动态 SQL 字符串（确需动态处集中封装并单测）。逻辑删除、乐观锁在 SQL 中显式写出（`deleted=0`、`version=?`）。
 - 需要当前用户时统一从 context 取会话；禁止硬编码 `userId`。
-- Redis key、锁、token 语义与原版对齐时保持前缀与 TTL 一致，便于同一 Redis 对照；刷新 token 使用一次性消费（如 `GETDEL`）。
+- Redis key、锁、token 语义与原版对齐时保持前缀与 TTL 一致；刷新 token 使用一次性消费（如 `GETDEL`）。
 - 缓存显式 cache-aside；能不缓存就不缓存。写路径负责主动失效，禁止“读不到就假装成功”的降级。
 
 ## 开发文档
@@ -54,12 +54,12 @@
 
 ## 数据库迁移
 
-- 迁移使用 **goose**，SQL 放在 `db/migrations/`；与 Java Flyway 共用同一 MySQL 库 `ai_fusion_video`（strangler），表结构与接口契约保持可对照。
+- 迁移使用 **goose**，SQL 放在 `db/migrations/`；目标 **MySQL**，可与 Java Flyway 共用库 `ai_fusion_video`（strangler），表结构与接口契约保持可对照。
 - 新增迁移前先核对原仓 `R/db/migration/` 是否已有对应脚本，优先复用/同步，避免双源漂移。
 - SQL 中表、字段等数据库 `COMMENT` 使用中文（产品或协议专名除外），禁止英文说明。
 - 已在共享或对照库执行过的迁移，视为不可随意改写；本地可丢弃的库优先重建。不能增加代码 fallback 来掩盖迁移错误。
 
-## 学习对照
+## 对照实现
 
-- 对照阅读路径见 [学习路线.md](学习路线.md)；原 Java 仓默认在 `E:/workspace/JProject/ai-fusion-video`（仅文档对照，不是运行时配置）。
+- 原 Java 仓仅作阅读对照（默认路径 `E:/workspace/JProject/ai-fusion-video`），不作为本仓运行时依赖。
 - 每一阶段先读懂原版行为与契约，再在 Go 侧实现最小可运行版本；禁止为“提前完整”堆未调用的抽象。
