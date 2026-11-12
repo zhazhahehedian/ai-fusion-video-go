@@ -1,0 +1,44 @@
+# Local MySQL + Redis for Go study (ports aligned with Java middleware compose).
+# Prefer ONE MySQL for both Java and Go (strangler). If Java full stack is
+# already up and exposes 43306/46379, you can skip this file.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: afv-study-mysql
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT:-43306}:3306"
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_fusion_video}
+      MYSQL_USER: ${MYSQL_USER:-fusion}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-123456}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-time-zone=+08:00
+    volumes:
+      - afv_study_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: afv-study-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-46379}:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-123456}
+    volumes:
+      - afv_study_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-123456}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  afv_study_mysql_data:
+  afv_study_redis_data:

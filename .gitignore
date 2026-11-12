@@ -1,0 +1,25 @@
+# env / secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Go
+bin/
+dist/
+*.exe
+*.test
+*.out
+coverage.out
+vendor/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# sqlc / tooling caches
+.tmp/
+.cache/
