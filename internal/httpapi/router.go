@@ -9,7 +9,7 @@ import (
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/config"
 )
 
-func NewRouter(cfg config.Config) http.Handler {
+func NewRouter(_ config.Config) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -18,9 +18,7 @@ func NewRouter(cfg config.Config) http.Handler {
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		WriteOK(w, map[string]any{
-			"status":   "up",
-			"phase":    1,
-			"javaRoot": cfg.JavaRoot,
+			"status": "up",
 		})
 	})
 

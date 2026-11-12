@@ -12,7 +12,7 @@ func main() {
 	cfg := config.Load()
 	handler := httpapi.NewRouter(cfg)
 
-	log.Printf("phase1 healthz listening on %s (JAVA_ROOT=%s)", cfg.HTTPAddr, cfg.JavaRoot)
+	log.Printf("服务已启动，监听 %s", cfg.HTTPAddr)
 	if err := http.ListenAndServe(cfg.HTTPAddr, handler); err != nil {
 		log.Fatal(err)
 	}

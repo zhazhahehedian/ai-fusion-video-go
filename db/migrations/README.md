@@ -4,7 +4,7 @@
 
 阶段2 起推荐两种其一（选一种贯彻到底）：
 
-1. **软链 / 同步脚本**：从 `JAVA_ROOT/ai-fusion-video/src/main/resources/db/migration/` 同步 `.sql`，goose 使用 `goose mysql ... up`（必要时把 Flyway 文件名改成 goose 可识别的 `NNNNNN_name.sql`）。
+1. **软链 / 同步脚本**：从原仓 `ai-fusion-video/src/main/resources/db/migration/` 同步 `.sql`，再用 goose 执行（必要时把 Flyway 文件名改成 goose 可识别的 `NNNNNN_name.sql`）。
 2. **最小子集拷贝**：只拷阶段2需要的表（`sys_user`、token 无关表结构、`afv_project` 等），在本目录维护增量。
 
 约定：Go 与 Java **共用同一个 MySQL 库** `ai_fusion_video`，做到随时对照切换。

@@ -5,17 +5,14 @@ import (
 	"strings"
 )
 
-// Config holds process-level settings. Phase 1 only needs HTTP listen addr
-// and a pointer to the Java reference tree.
+// Config holds process-level settings.
 type Config struct {
 	HTTPAddr string
-	JavaRoot string
 }
 
 func Load() Config {
 	return Config{
 		HTTPAddr: getenv("HTTP_ADDR", ":18080"),
-		JavaRoot: getenv("JAVA_ROOT", "E:/workspace/JProject/ai-fusion-video"),
 	}
 }
 

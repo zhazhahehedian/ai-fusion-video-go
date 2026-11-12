@@ -23,3 +23,6 @@ Thumbs.db
 # sqlc / tooling caches
 .tmp/
 .cache/
+
+# local verification artifacts
+.local/
