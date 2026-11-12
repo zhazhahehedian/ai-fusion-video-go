@@ -6,7 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"origin.cursor.com/yuigakki-w/ai-fusion-video-study/internal/config"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/config"
 )
 
 func NewRouter(cfg config.Config) http.Handler {

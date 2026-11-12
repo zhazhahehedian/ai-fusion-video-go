@@ -1,6 +1,6 @@
 .PHONY: tidy run sqlc migrate-status migrate-up migrate-down docker-up docker-down
 
-MODULE := origin.cursor.com/yuigakki-w/ai-fusion-video-study
+MODULE := github.com/zhazhahehedian/ai-fusion-video-go
 HTTP_ADDR ?= :18080
 
 tidy:

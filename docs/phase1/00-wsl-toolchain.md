@@ -8,7 +8,7 @@
 cd /mnt/e/workspace/GoProject/ai-fusion-video-study
 ```
 
-若磁盘挂载权限别扭，可把仓 clone 到 `~/code/ai-fusion-video-study`（Origin remote 已配好）。
+若磁盘挂载权限别扭，可把仓 clone 到 `~/code/ai-fusion-video-go`（GitHub remote：`zhazhahehedian/ai-fusion-video-go`）。
 
 ## 2. 安装 Go 1.23+
 
@@ -41,25 +41,19 @@ curl -s http://127.0.0.1:18080/healthz
 # 期望: {"code":0,"msg":"ok","data":{"status":"up","phase":1,...}}
 ```
 
-## 5. Origin CLI（推代码用，仅 Linux/WSL）
-
-Windows 原生暂不支持 origin CLI。在 WSL：
+## 5. 推到 GitHub
 
 ```bash
-curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-origin auth login
-```
-
-之后在本仓：
-
-```bash
+git remote -v
+# 应为 https://github.com/zhazhahehedian/ai-fusion-video-go.git
 git push -u origin main
 ```
+
+未登录时用 `gh auth login`，或在 Cursor 里连接 GitHub。
 
 ## 勾选
 
 - [ ] `go version` ≥ 1.23
 - [ ] `sqlc` / `goose` 在 PATH
 - [ ] `curl localhost:18080/healthz` 返回 `code:0`
-- [ ] （可选）`origin auth login` 成功并能 `git push`
+- [ ] `git push -u origin main` 成功

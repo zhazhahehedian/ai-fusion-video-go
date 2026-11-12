@@ -1,4 +1,4 @@
-module origin.cursor.com/yuigakki-w/ai-fusion-video-study
+module github.com/zhazhahehedian/ai-fusion-video-go
 
 go 1.23.0
 

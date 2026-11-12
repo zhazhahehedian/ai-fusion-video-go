@@ -1,8 +1,8 @@
-# ai-fusion-video-study
+# ai-fusion-video-go
 
 融光（ai-fusion-video）**Java → Go** 对照学习仓。按 [学习路线.md](学习路线.md) 分阶段实现；与原 Java 仓共用同一 MySQL（strangler）。
 
-- **Origin（私有）**: https://origin.cursor.com/yuigakki-w/ai-fusion-video-study
+- **GitHub**: https://github.com/zhazhahehedian/ai-fusion-video-go
 - **Java 对照根目录**: `JAVA_ROOT=E:/workspace/JProject/ai-fusion-video`
 
 路径前缀：`B/` / `R/` / `W/` 见学习路线文首。
@@ -17,7 +17,7 @@
 | Redis | go-redis/v9（阶段2起） |
 | 运行时 | WSL2 + Go 1.23+ |
 
-为什么是 sqlc+goose、为什么选 chi 不选 gin：见对话结论与阶段2文档；一句话——**SQL 与中间件都贴近原项目/标准库，方便对照学习**。
+为什么是 sqlc+goose、为什么选 chi 不选 gin：SQL 与中间件都贴近原项目/标准库，方便对照学习。
 
 ## 仓库结构
 

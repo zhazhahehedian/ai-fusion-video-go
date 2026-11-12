@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"origin.cursor.com/yuigakki-w/ai-fusion-video-study/internal/config"
-	"origin.cursor.com/yuigakki-w/ai-fusion-video-study/internal/httpapi"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/config"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/httpapi"
 )
 
 func main() {
