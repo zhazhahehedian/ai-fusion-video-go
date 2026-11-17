@@ -70,7 +70,10 @@ func (ScriptSceneCreate) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resou
 		}
 	}
 
-	sceneNumber := optionalNullString(create.Fields["sceneNumber"])
+	sceneNumber, err := optionalNullString(create.Fields["sceneNumber"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
 	if !sceneNumber.Valid {
 		epNum := nullInt32Value(ep.EpisodeNumber)
 		sceneNumber = sql.NullString{
@@ -87,20 +90,60 @@ func (ScriptSceneCreate) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resou
 		}
 	}
 
+	sceneHeading, err := optionalNullString(create.Fields["sceneHeading"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	location, err := optionalNullString(create.Fields["location"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	timeOfDay, err := optionalNullString(create.Fields["timeOfDay"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	intExt, err := optionalNullString(create.Fields["intExt"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	characters, err := optionalJSONArray(create.Fields["characters"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	characterAssetIDs, err := optionalJSONArray(create.Fields["characterAssetIds"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	sceneAssetID, err := optionalNullInt64(create.Fields["sceneAssetId"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	propAssetIDs, err := optionalJSONArray(create.Fields["propAssetIds"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	sceneDescription, err := optionalNullString(create.Fields["sceneDescription"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	dialogues, err := optionalJSONArray(create.Fields["dialogues"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
 	id, err := q.CreateScriptScene(ctx, sqlcdb.CreateScriptSceneParams{
 		EpisodeID:         episodeID,
 		ScriptID:          ep.ScriptID,
 		SceneNumber:       sceneNumber,
-		SceneHeading:      optionalNullString(create.Fields["sceneHeading"]),
-		Location:          optionalNullString(create.Fields["location"]),
-		TimeOfDay:         optionalNullString(create.Fields["timeOfDay"]),
-		IntExt:            optionalNullString(create.Fields["intExt"]),
-		Characters:        optionalJSONArray(create.Fields["characters"]),
-		CharacterAssetIds: optionalJSONArray(create.Fields["characterAssetIds"]),
-		SceneAssetID:      optionalNullInt64(create.Fields["sceneAssetId"]),
-		PropAssetIds:      optionalJSONArray(create.Fields["propAssetIds"]),
-		SceneDescription:  optionalNullString(create.Fields["sceneDescription"]),
-		Dialogues:         optionalJSONArray(create.Fields["dialogues"]),
+		SceneHeading:      sceneHeading,
+		Location:          location,
+		TimeOfDay:         timeOfDay,
+		IntExt:            intExt,
+		Characters:        characters,
+		CharacterAssetIds: characterAssetIDs,
+		SceneAssetID:      sceneAssetID,
+		PropAssetIds:      propAssetIDs,
+		SceneDescription:  sceneDescription,
+		Dialogues:         dialogues,
 		SortOrder:         sql.NullInt32{Int32: sortOrder, Valid: true},
 		Status:            sql.NullInt32{Int32: status, Valid: true},
 	})
@@ -218,27 +261,27 @@ func (ScriptScenePatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resour
 		changed = append(changed, key)
 		switch key {
 		case "sceneNumber":
-			sceneNumber = optionalNullString(value)
+			sceneNumber, err = optionalNullString(value)
 		case "sceneHeading":
-			sceneHeading = optionalNullString(value)
+			sceneHeading, err = optionalNullString(value)
 		case "location":
-			location = optionalNullString(value)
+			location, err = optionalNullString(value)
 		case "timeOfDay":
-			timeOfDay = optionalNullString(value)
+			timeOfDay, err = optionalNullString(value)
 		case "intExt":
-			intExt = optionalNullString(value)
+			intExt, err = optionalNullString(value)
 		case "characters":
-			characters = optionalJSONArray(value)
+			characters, err = optionalJSONArray(value)
 		case "characterAssetIds":
-			characterAssetIds = optionalJSONArray(value)
+			characterAssetIds, err = optionalJSONArray(value)
 		case "sceneAssetId":
-			sceneAssetID = optionalNullInt64(value)
+			sceneAssetID, err = optionalNullInt64(value)
 		case "propAssetIds":
-			propAssetIds = optionalJSONArray(value)
+			propAssetIds, err = optionalJSONArray(value)
 		case "sceneDescription":
-			sceneDescription = optionalNullString(value)
+			sceneDescription, err = optionalNullString(value)
 		case "dialogues":
-			dialogues = optionalJSONArray(value)
+			dialogues, err = optionalJSONArray(value)
 		case "sortOrder":
 			n, err := requiredNonNegInt(value, "sortOrder")
 			if err != nil {
@@ -253,6 +296,9 @@ func (ScriptScenePatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resour
 			status = sql.NullInt32{Int32: n, Valid: true}
 		default:
 			return resource.Mutation{}, apperr.BadRequest("不允许修改字段：" + key)
+		}
+		if err != nil {
+			return resource.Mutation{}, err
 		}
 	}
 

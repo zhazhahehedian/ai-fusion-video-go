@@ -51,16 +51,44 @@ func (ProjectCreate) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.
 		return resource.Mutation{}, apperr.BadRequest("项目名称不能为空")
 	}
 
+	description, err := optionalNullString(create.Fields["description"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	coverURL, err := optionalNullString(create.Fields["coverUrl"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	properties, err := optionalJSON(create.Fields["properties"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	artStyle, err := optionalNullString(create.Fields["artStyle"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	artStyleDescription, err := optionalNullString(create.Fields["artStyleDescription"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	artStyleImagePrompt, err := optionalNullString(create.Fields["artStyleImagePrompt"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	artStyleImageURL, err := optionalNullString(create.Fields["artStyleImageUrl"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
 	projectID, err := q.CreateOwnedProject(ctx, sqlcdb.CreateOwnedProjectParams{
 		Name:                name,
-		Description:         optionalNullString(create.Fields["description"]),
-		CoverUrl:            optionalNullString(create.Fields["coverUrl"]),
+		Description:         description,
+		CoverUrl:            coverURL,
 		OwnerID:             actorUserID,
-		Properties:          optionalJSON(create.Fields["properties"]),
-		ArtStyle:            optionalNullString(create.Fields["artStyle"]),
-		ArtStyleDescription: optionalNullString(create.Fields["artStyleDescription"]),
-		ArtStyleImagePrompt: optionalNullString(create.Fields["artStyleImagePrompt"]),
-		ArtStyleImageUrl:    optionalNullString(create.Fields["artStyleImageUrl"]),
+		Properties:          properties,
+		ArtStyle:            artStyle,
+		ArtStyleDescription: artStyleDescription,
+		ArtStyleImagePrompt: artStyleImagePrompt,
+		ArtStyleImageUrl:    artStyleImageURL,
 	})
 	if err != nil {
 		return resource.Mutation{}, err

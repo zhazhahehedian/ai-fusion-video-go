@@ -59,13 +59,13 @@ func (ScriptPatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.Co
 		changed = append(changed, key)
 		switch key {
 		case "content":
-			content = optionalNullString(value)
+			content, err = optionalNullString(value)
 		case "rawContent":
-			rawContent = optionalNullString(value)
+			rawContent, err = optionalNullString(value)
 		case "storySynopsis":
-			storySynopsis = optionalNullString(value)
+			storySynopsis, err = optionalNullString(value)
 		case "charactersJson":
-			charactersJSON = optionalJSONArray(value)
+			charactersJSON, err = optionalJSONArray(value)
 		case "sourceType":
 			n, err := requiredNonNegInt(value, "sourceType")
 			if err != nil {
@@ -79,15 +79,15 @@ func (ScriptPatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.Co
 			}
 			parsingStatus = sql.NullInt32{Int32: n, Valid: true}
 		case "parsingProgress":
-			parsingProgress = optionalNullString(value)
+			parsingProgress, err = optionalNullString(value)
 		case "summary":
-			summary = optionalNullString(value)
+			summary, err = optionalNullString(value)
 		case "genre":
-			genre = optionalNullString(value)
+			genre, err = optionalNullString(value)
 		case "targetAudience":
-			targetAudience = optionalNullString(value)
+			targetAudience, err = optionalNullString(value)
 		case "durationEstimate":
-			durationEstimate = optionalNullInt32(value)
+			durationEstimate, err = optionalNullInt32(value)
 		case "status":
 			n, err := requiredNonNegInt(value, "status")
 			if err != nil {
@@ -96,6 +96,9 @@ func (ScriptPatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.Co
 			status = sql.NullInt32{Int32: n, Valid: true}
 		default:
 			return resource.Mutation{}, apperr.BadRequest("不允许修改字段：" + key)
+		}
+		if err != nil {
+			return resource.Mutation{}, err
 		}
 	}
 

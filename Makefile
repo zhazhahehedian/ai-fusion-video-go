@@ -2,7 +2,7 @@
 
 MODULE := github.com/zhazhahehedian/ai-fusion-video-go
 HTTP_ADDR ?= :18080
-DATABASE_URL ?= fusion:123456@tcp(127.0.0.1:43306)/ai_fusion_video?parseTime=true&loc=Local
+DATABASE_URL ?= fusion:123456@tcp(127.0.0.1:43306)/ai_fusion_video?parseTime=true&loc=UTC
 REDIS_ADDR ?= 127.0.0.1:46379
 REDIS_PASSWORD ?= 123456
 
@@ -13,7 +13,7 @@ run:
 	HTTP_ADDR=$(HTTP_ADDR) DATABASE_URL='$(DATABASE_URL)' REDIS_ADDR=$(REDIS_ADDR) REDIS_PASSWORD=$(REDIS_PASSWORD) go run ./cmd/server
 
 sqlc:
-	sqlc generate -f db/sqlc.yaml
+	bash scripts/sqlc-generate.sh
 
 migrate-status:
 	goose -dir db/migrations mysql "$(DATABASE_URL)" status
