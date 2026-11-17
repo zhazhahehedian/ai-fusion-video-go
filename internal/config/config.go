@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -18,6 +19,13 @@ type Config struct {
 	RedisDB       int
 
 	FFmpegPath string
+
+	// AppEnv 为 development 或 production。默认 development。
+	AppEnv string
+	// LogLevel 已解析。LOG_LEVEL 默认 info。
+	LogLevel slog.Level
+	// LogFormat 为 text 或 json。LOG_FORMAT 为空时，development 用 text，production 用 json。
+	LogFormat string
 
 	DBMaxOpenConns    int
 	DBMaxIdleConns    int
@@ -37,6 +45,13 @@ func Load() (Config, error) {
 		DBMaxIdleConns:    5,
 		DBConnMaxLifetime: 30 * time.Minute,
 	}
+	env, level, format, err := resolveLog(os.Getenv("APP_ENV"), os.Getenv("LOG_LEVEL"), os.Getenv("LOG_FORMAT"))
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.AppEnv = env
+	cfg.LogLevel = level
+	cfg.LogFormat = format
 	if strings.TrimSpace(cfg.DatabaseURL) == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL 未配置")
 	}
@@ -52,4 +67,49 @@ func getenv(key, fallback string) string {
 		return fallback
 	}
 	return v
+}
+
+func resolveLog(env, level, format string) (string, slog.Level, string, error) {
+	env = strings.ToLower(strings.TrimSpace(env))
+	if env == "" {
+		env = "development"
+	}
+	switch env {
+	case "development", "production":
+	default:
+		return "", 0, "", fmt.Errorf("APP_ENV 无效: %s", env)
+	}
+
+	level = strings.ToLower(strings.TrimSpace(level))
+	if level == "" {
+		level = "info"
+	}
+	var slogLevel slog.Level
+	switch level {
+	case "debug":
+		slogLevel = slog.LevelDebug
+	case "info":
+		slogLevel = slog.LevelInfo
+	case "warn", "warning":
+		slogLevel = slog.LevelWarn
+	case "error":
+		slogLevel = slog.LevelError
+	default:
+		return "", 0, "", fmt.Errorf("LOG_LEVEL 无效: %s", level)
+	}
+
+	format = strings.ToLower(strings.TrimSpace(format))
+	if format == "" {
+		if env == "production" {
+			format = "json"
+		} else {
+			format = "text"
+		}
+	}
+	switch format {
+	case "text", "json":
+	default:
+		return "", 0, "", fmt.Errorf("LOG_FORMAT 无效: %s", format)
+	}
+	return env, slogLevel, format, nil
 }

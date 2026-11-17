@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +15,7 @@ import (
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/config"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/generation"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/httpapi"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/logging"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/media"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/platform"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/project"
@@ -23,20 +25,30 @@ import (
 )
 
 func main() {
+	os.Exit(run(os.Stderr))
+}
+
+func run(logOut io.Writer) int {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("加载配置失败: %v", err)
+		slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: slog.LevelError})).
+			Error("加载配置失败", "err", err)
+		return 1
 	}
+	logger := logging.New(logOut, cfg.LogLevel, cfg.LogFormat)
+	slog.SetDefault(logger)
 
 	db, err := platform.OpenMySQL(cfg)
 	if err != nil {
-		log.Fatalf("%v", err)
+		logger.Error("打开 MySQL 失败", "err", err)
+		return 1
 	}
 	defer db.Close()
 
 	rdb, err := platform.OpenRedis(cfg)
 	if err != nil {
-		log.Fatalf("%v", err)
+		logger.Error("打开 Redis 失败", "err", err)
+		return 1
 	}
 	defer rdb.Close()
 
@@ -56,19 +68,21 @@ func main() {
 		handlers.ScriptSceneDelete{},
 	)
 	if err != nil {
-		log.Fatalf("注册资源命令处理器失败: %v", err)
+		logger.Error("注册资源命令处理器失败", "err", err)
+		return 1
 	}
 	commandSvc := resource.NewService(db, registry)
 	scriptQuery := resource.NewScriptQuery(db)
 	generationSvc := generation.NewService(db)
 	jobRepo := generation.NewRepository(db)
-	outbox := generation.NewOutbox(db)
-	worker := generation.NewWorker(jobRepo)
+	outbox := generation.NewOutbox(db, logger)
+	worker := generation.NewWorker(jobRepo, logger)
 	mediaSvc := media.NewService(db)
 	mediaRepo := media.NewRepository(db)
-	mediaWorker := media.NewWorker(mediaRepo, cfg.FFmpegPath)
+	mediaWorker := media.NewWorker(mediaRepo, cfg.FFmpegPath, logger)
 
 	handler := httpapi.NewRouter(httpapi.Deps{
+		Logger:     logger,
 		DB:         db,
 		Redis:      rdb,
 		Auth:       authSvc,
@@ -86,7 +100,7 @@ func main() {
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		log.Printf("服务已启动，监听 %s", cfg.HTTPAddr)
+		logger.Info("服务已启动", "addr", cfg.HTTPAddr, "env", cfg.AppEnv, "log_format", cfg.LogFormat)
 		err := server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
@@ -122,6 +136,8 @@ func main() {
 	})
 
 	if err := g.Wait(); err != nil {
-		log.Fatal(err)
+		logger.Error("进程退出", "err", err)
+		return 1
 	}
+	return 0
 }

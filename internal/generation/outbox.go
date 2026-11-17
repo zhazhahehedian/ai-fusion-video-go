@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/sqlcdb"
@@ -13,8 +13,10 @@ import (
 
 // deliveryFailure 表示本条事件投递失败。发布事务已回滚，需要在独立事务里退避。
 type deliveryFailure struct {
-	id  int64
-	err error
+	id          int64
+	eventType   string
+	aggregateID string
+	err         error
 }
 
 func (e *deliveryFailure) Error() string {
@@ -23,13 +25,33 @@ func (e *deliveryFailure) Error() string {
 
 func (e *deliveryFailure) Unwrap() error { return e.err }
 
+// backoffFailure 是独立事务里的退避失败。投递错误仍挂在 delivery 上，循环应停下来。
+type backoffFailure struct {
+	delivery *deliveryFailure
+	err      error
+}
+
+func (e *backoffFailure) Error() string {
+	return fmt.Sprintf("outbox %d 退避失败: %v（投递错误: %v）", e.delivery.id, e.err, e.delivery.err)
+}
+
+func (e *backoffFailure) Unwrap() error { return e.err }
+
 type Outbox struct {
 	db       *sql.DB
+	logger   *slog.Logger
 	interval time.Duration
 }
 
-func NewOutbox(db *sql.DB) *Outbox {
-	return &Outbox{db: db, interval: 500 * time.Millisecond}
+func NewOutbox(db *sql.DB, logger *slog.Logger) *Outbox {
+	if logger == nil {
+		panic("generation.NewOutbox: logger 未注入")
+	}
+	return &Outbox{
+		db:       db,
+		logger:   logger.With(slog.String("component", "generation_outbox")),
+		interval: 500 * time.Millisecond,
+	}
 }
 
 func (o *Outbox) Run(ctx context.Context) error {
@@ -43,13 +65,16 @@ func (o *Outbox) Run(ctx context.Context) error {
 			for i := 0; i < 32; i++ {
 				published, err := o.publishOne(ctx)
 				if err != nil {
+					o.logFailure(ctx, err)
+					var stopped *backoffFailure
+					if errors.As(err, &stopped) {
+						break
+					}
 					var failed *deliveryFailure
 					if errors.As(err, &failed) {
 						// 退避已在独立事务提交，本条 next_attempt_at 推后，后续事件可以继续。
-						log.Printf("generation outbox: %v", err)
 						continue
 					}
-					log.Printf("generation outbox: %v", err)
 					break
 				}
 				if !published {
@@ -58,6 +83,33 @@ func (o *Outbox) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func (o *Outbox) logFailure(ctx context.Context, err error) {
+	var stopped *backoffFailure
+	if errors.As(err, &stopped) {
+		o.logger.ErrorContext(ctx, "发件箱退避失败",
+			slog.Int64("outbox_id", stopped.delivery.id),
+			slog.String("job_id", stopped.delivery.aggregateID),
+			slog.String("event_type", stopped.delivery.eventType),
+			slog.String("aggregate_id", stopped.delivery.aggregateID),
+			"err", stopped.err,
+			"delivery_err", stopped.delivery.err,
+		)
+		return
+	}
+	var failed *deliveryFailure
+	if errors.As(err, &failed) {
+		o.logger.ErrorContext(ctx, "发件箱投递失败",
+			slog.Int64("outbox_id", failed.id),
+			slog.String("job_id", failed.aggregateID),
+			slog.String("event_type", failed.eventType),
+			slog.String("aggregate_id", failed.aggregateID),
+			"err", failed.err,
+		)
+		return
+	}
+	o.logger.ErrorContext(ctx, "发件箱投递失败", "err", err)
 }
 
 func (o *Outbox) publishOne(ctx context.Context) (bool, error) {
@@ -78,7 +130,12 @@ func (o *Outbox) publishOne(ctx context.Context) (bool, error) {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return err
 			}
-			return &deliveryFailure{id: row.ID, err: err}
+			return &deliveryFailure{
+				id:          row.ID,
+				eventType:   row.EventType,
+				aggregateID: row.AggregateID,
+				err:         err,
+			}
 		}
 		published = true
 		return nil
@@ -86,7 +143,7 @@ func (o *Outbox) publishOne(ctx context.Context) (bool, error) {
 	var failed *deliveryFailure
 	if errors.As(err, &failed) {
 		if berr := o.backoff(ctx, failed); berr != nil {
-			return false, fmt.Errorf("outbox %d 退避失败: %w（投递错误: %v）", failed.id, berr, failed.err)
+			return false, &backoffFailure{delivery: failed, err: berr}
 		}
 		return false, err
 	}

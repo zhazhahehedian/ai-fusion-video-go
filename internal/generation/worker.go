@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -13,6 +13,7 @@ import (
 
 type Worker struct {
 	repo     *Repository
+	logger   *slog.Logger
 	instance string
 	slots    chan struct{}
 	interval time.Duration
@@ -22,10 +23,15 @@ type Worker struct {
 	active map[Claim]struct{}
 }
 
-func NewWorker(repo *Repository) *Worker {
+func NewWorker(repo *Repository, logger *slog.Logger) *Worker {
+	if logger == nil {
+		panic("generation.NewWorker: logger 未注入")
+	}
+	instance := "generation-" + newUUID()
 	return &Worker{
 		repo:     repo,
-		instance: "generation-" + newUUID(),
+		logger:   logger.With(slog.String("component", "generation_worker"), slog.String("instance", instance)),
+		instance: instance,
 		slots:    make(chan struct{}, 16),
 		interval: 500 * time.Millisecond,
 		hbEvery:  20 * time.Second,
@@ -54,7 +60,13 @@ func (w *Worker) Run(ctx context.Context) error {
 			}
 			w.mu.Unlock()
 			for _, c := range claims {
-				_ = w.repo.Heartbeat(ctx, c)
+				if err := w.repo.Heartbeat(ctx, c); err != nil {
+					w.logger.WarnContext(ctx, "生成任务续租失败",
+						slog.String("job_id", c.ID),
+						slog.Int64("owner_epoch", c.Epoch),
+						slog.String("err", err.Error()),
+					)
+				}
 			}
 		case <-dispatch.C:
 			for {
@@ -69,7 +81,7 @@ func (w *Worker) Run(ctx context.Context) error {
 				job, err := w.repo.Claim(ctx, w.instance)
 				if err != nil {
 					<-w.slots
-					log.Printf("generation claim: %v", err)
+					w.logger.ErrorContext(ctx, "领取生成任务失败", "err", err)
 					goto waitNext
 				}
 				if job == nil {
@@ -84,9 +96,15 @@ func (w *Worker) Run(ctx context.Context) error {
 					defer wg.Done()
 					defer func() { <-w.slots }()
 					defer w.track(c, false)
+					jobLog := w.logger.With(
+						slog.String("job_id", j.ID),
+						slog.Int64("owner_epoch", c.Epoch),
+						slog.String("phase", j.Phase),
+						slog.String("state", j.State),
+					)
 					if err := w.execute(ctx, j); err != nil && !errors.Is(err, context.Canceled) {
 						if !errors.Is(err, ErrLeaseLost) {
-							log.Printf("generation job %s: %v", j.ID, err)
+							jobLog.ErrorContext(ctx, "生成任务执行失败", "err", err)
 						}
 					}
 				}(*job, claim)

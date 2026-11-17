@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -283,7 +284,7 @@ func TestMySQLOutboxBackoffDoesNotBlockLaterEvents(t *testing.T) {
 		VALUES ('good-key', 'GENERATION_CHANGED', 'agg-good', JSON_OBJECT(), UTC_TIMESTAMP(6), UTC_TIMESTAMP(6))`); err != nil {
 		t.Fatal(err)
 	}
-	ob := NewOutbox(db)
+	ob := NewOutbox(db, slog.New(slog.DiscardHandler))
 	published, err := ob.publishOne(ctx)
 	var failed *deliveryFailure
 	if !errors.As(err, &failed) || published {
