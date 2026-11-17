@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -11,12 +12,14 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/auth"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/generation"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/logging"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/media"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/project"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/resource"
 )
 
 type Deps struct {
+	Logger     *slog.Logger
 	DB         *sql.DB
 	Redis      *redis.Client
 	Auth       *auth.Service
@@ -28,11 +31,13 @@ type Deps struct {
 }
 
 func NewRouter(deps Deps) http.Handler {
+	if deps.Logger == nil {
+		panic("httpapi.NewRouter: logger 未注入")
+	}
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(AccessLog(deps.Logger))
+	r.Use(Recover)
 
 	r.Get("/healthz", deps.handleHealthz)
 
@@ -83,11 +88,13 @@ func (d Deps) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
+	logger := logging.From(r.Context())
 	mysqlOK := true
 	mysqlMsg := "up"
 	if err := d.DB.PingContext(ctx); err != nil {
 		mysqlOK = false
 		mysqlMsg = err.Error()
+		logger.ErrorContext(r.Context(), "MySQL 探活失败", "err", err)
 	}
 
 	redisOK := true
@@ -95,6 +102,7 @@ func (d Deps) handleHealthz(w http.ResponseWriter, r *http.Request) {
 	if err := d.Redis.Ping(ctx).Err(); err != nil {
 		redisOK = false
 		redisMsg = err.Error()
+		logger.ErrorContext(r.Context(), "Redis 探活失败", "err", err)
 	}
 
 	payload := map[string]any{

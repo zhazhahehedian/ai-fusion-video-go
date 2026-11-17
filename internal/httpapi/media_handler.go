@@ -18,12 +18,12 @@ type mediaEnqueueReq struct {
 func (d Deps) handleMediaEnqueue(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	var req mediaEnqueueReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, apperr.BadRequest("请求体无效"))
+		WriteError(w, r, apperr.BadRequest("请求体无效"))
 		return
 	}
 	result, err := d.Media.Enqueue(r.Context(), session.UserID, media.EnqueueRequest{
@@ -31,7 +31,7 @@ func (d Deps) handleMediaEnqueue(w http.ResponseWriter, r *http.Request) {
 		Kind:      req.Kind,
 	})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, result)
@@ -40,17 +40,17 @@ func (d Deps) handleMediaEnqueue(w http.ResponseWriter, r *http.Request) {
 func (d Deps) handleMediaJobGet(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		WriteError(w, apperr.BadRequest("id 无效"))
+		WriteError(w, r, apperr.BadRequest("id 无效"))
 		return
 	}
 	view, err := d.Media.Get(r.Context(), session.UserID, id)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, view)

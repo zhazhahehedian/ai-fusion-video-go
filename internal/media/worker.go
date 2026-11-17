@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +15,7 @@ import (
 
 type Worker struct {
 	repo     *Repository
+	logger   *slog.Logger
 	runner   *ProcessRunner
 	ffmpeg   string
 	instance string
@@ -25,15 +26,20 @@ type Worker struct {
 	active atomic.Pointer[Claim]
 }
 
-func NewWorker(repo *Repository, ffmpegPath string) *Worker {
+func NewWorker(repo *Repository, ffmpegPath string, logger *slog.Logger) *Worker {
+	if logger == nil {
+		panic("media.NewWorker: logger 未注入")
+	}
 	if strings.TrimSpace(ffmpegPath) == "" {
 		ffmpegPath = "ffmpeg"
 	}
+	instance := "media-" + newUUID()
 	return &Worker{
 		repo:     repo,
+		logger:   logger.With(slog.String("component", "media_worker"), slog.String("instance", instance)),
 		runner:   NewProcessRunner(),
 		ffmpeg:   ffmpegPath,
-		instance: "media-" + newUUID(),
+		instance: instance,
 		interval: time.Second,
 		hbEvery:  20 * time.Second,
 	}
@@ -54,7 +60,13 @@ func (w *Worker) Run(ctx context.Context) error {
 			return ctx.Err()
 		case <-heartbeat.C:
 			if c := w.active.Load(); c != nil {
-				_ = w.repo.Heartbeat(ctx, *c)
+				if err := w.repo.Heartbeat(ctx, *c); err != nil {
+					w.logger.WarnContext(ctx, "媒体任务续租失败",
+						slog.String("job_id", c.ID),
+						slog.Int64("owner_epoch", c.Epoch),
+						slog.String("err", err.Error()),
+					)
+				}
 			}
 		case <-dispatch.C:
 			if !w.busy.CompareAndSwap(false, true) {
@@ -64,44 +76,53 @@ func (w *Worker) Run(ctx context.Context) error {
 			go func() {
 				defer wg.Done()
 				defer w.busy.Store(false)
-				if err := w.runOne(ctx); err != nil && !errors.Is(err, context.Canceled) {
-					if !errors.Is(err, ErrLeaseLost) {
-						log.Printf("media worker: %v", err)
-					}
-				}
+				w.runOne(ctx)
 			}()
 		}
 	}
 }
 
-func (w *Worker) runOne(ctx context.Context) error {
+func (w *Worker) runOne(ctx context.Context) {
 	job, err := w.repo.Claim(ctx, w.instance)
 	if err != nil {
-		return err
+		w.logger.ErrorContext(ctx, "领取媒体任务失败", "err", err)
+		return
 	}
 	if job == nil {
-		return nil
+		return
 	}
 	claim := job.Claim()
 	w.active.Store(&claim)
 	defer w.active.Store(nil)
 
+	jobLog := w.logger.With(
+		slog.String("job_id", job.ID),
+		slog.Int64("owner_epoch", job.OwnerEpoch),
+		slog.String("phase", job.Phase),
+		slog.String("status", job.Status),
+	)
 	if job.CancelRequested {
-		return w.repo.Cancel(ctx, claim, "已取消", "任务在执行前被取消")
+		err = w.repo.Cancel(ctx, claim, "已取消", "任务在执行前被取消")
+	} else {
+		var now time.Time
+		now, err = w.repo.Now(ctx)
+		if err != nil {
+			jobLog.ErrorContext(ctx, "读取数据库时钟失败", "err", err)
+			return
+		}
+		if now.After(job.DeadlineAt) {
+			err = w.repo.Fail(ctx, claim, "已超时", "媒体任务超过截止时间")
+		} else {
+			switch job.Kind {
+			case KindFFmpegVersion:
+				err = w.runFFmpegVersion(ctx, claim)
+			default:
+				err = w.repo.Fail(ctx, claim, "不支持", "不支持的媒体任务类型: "+job.Kind)
+			}
+		}
 	}
-	now, err := w.repo.Now(ctx)
-	if err != nil {
-		return err
-	}
-	if now.After(job.DeadlineAt) {
-		return w.repo.Fail(ctx, claim, "已超时", "媒体任务超过截止时间")
-	}
-
-	switch job.Kind {
-	case KindFFmpegVersion:
-		return w.runFFmpegVersion(ctx, claim)
-	default:
-		return w.repo.Fail(ctx, claim, "不支持", "不支持的媒体任务类型: "+job.Kind)
+	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, ErrLeaseLost) {
+		jobLog.ErrorContext(ctx, "媒体任务执行失败", "err", err)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
@@ -63,13 +64,19 @@ func (r *Repository) Claim(ctx context.Context, owner string) (*Job, error) {
 	return claimed, err
 }
 
-func (r *Repository) Heartbeat(ctx context.Context, claim Claim) bool {
+func (r *Repository) Heartbeat(ctx context.Context, claim Claim) error {
 	n, err := sqlcdb.New(r.db).HeartbeatMediaJob(ctx, sqlcdb.HeartbeatMediaJobParams{
 		ID:              claim.ID,
 		OwnerInstanceID: sql.NullString{String: claim.Owner, Valid: true},
 		OwnerEpoch:      claim.Epoch,
 	})
-	return err == nil && n == 1
+	if err != nil {
+		return fmt.Errorf("续期媒体租约 job_id=%s: %w", claim.ID, err)
+	}
+	if n != 1 {
+		return fmt.Errorf("续期媒体租约未命中 job_id=%s owner_epoch=%d", claim.ID, claim.Epoch)
+	}
+	return nil
 }
 
 func (r *Repository) Check(ctx context.Context, claim Claim) (Job, error) {

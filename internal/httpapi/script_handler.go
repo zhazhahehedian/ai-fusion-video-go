@@ -34,17 +34,17 @@ type replaceSourceReq struct {
 func (d Deps) handleScriptByProject(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	projectID, err := strconv.ParseInt(chi.URLParam(r, "projectId"), 10, 64)
 	if err != nil || projectID <= 0 {
-		WriteError(w, apperr.BadRequest("projectId 无效"))
+		WriteError(w, r, apperr.BadRequest("projectId 无效"))
 		return
 	}
 	vo, err := d.Scripts.ByProject(r.Context(), session.UserID, projectID)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, vo)
@@ -53,17 +53,17 @@ func (d Deps) handleScriptByProject(w http.ResponseWriter, r *http.Request) {
 func (d Deps) handleScriptGet(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
-		WriteError(w, apperr.BadRequest("id 无效"))
+		WriteError(w, r, apperr.BadRequest("id 无效"))
 		return
 	}
 	vo, err := d.Scripts.Get(r.Context(), session.UserID, id)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, vo)
@@ -72,12 +72,12 @@ func (d Deps) handleScriptGet(w http.ResponseWriter, r *http.Request) {
 func (d Deps) handleScriptUpdate(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	var req patchResourceReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, apperr.BadRequest("请求体无效"))
+		WriteError(w, r, apperr.BadRequest("请求体无效"))
 		return
 	}
 	receipt, err := d.Commands.Execute(r.Context(), resource.PatchCommand{
@@ -88,7 +88,7 @@ func (d Deps) handleScriptUpdate(w http.ResponseWriter, r *http.Request) {
 		Patch:   req.Patch,
 	}, resource.Context{ActorUserID: session.UserID})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, receipt.Result)
@@ -97,17 +97,17 @@ func (d Deps) handleScriptUpdate(w http.ResponseWriter, r *http.Request) {
 func (d Deps) handleScriptReplaceSource(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
-		WriteError(w, apperr.BadRequest("id 无效"))
+		WriteError(w, r, apperr.BadRequest("id 无效"))
 		return
 	}
 	var req replaceSourceReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, apperr.BadRequest("请求体无效"))
+		WriteError(w, r, apperr.BadRequest("请求体无效"))
 		return
 	}
 	receipt, err := d.Commands.Execute(r.Context(), resource.SourceCommand{
@@ -117,7 +117,7 @@ func (d Deps) handleScriptReplaceSource(w http.ResponseWriter, r *http.Request) 
 		RawContent: req.RawContent,
 	}, resource.Context{ActorUserID: session.UserID})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, receipt.Result)
@@ -126,17 +126,17 @@ func (d Deps) handleScriptReplaceSource(w http.ResponseWriter, r *http.Request) 
 func (d Deps) handleScriptEpisodes(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	scriptID, err := strconv.ParseInt(chi.URLParam(r, "scriptId"), 10, 64)
 	if err != nil || scriptID <= 0 {
-		WriteError(w, apperr.BadRequest("scriptId 无效"))
+		WriteError(w, r, apperr.BadRequest("scriptId 无效"))
 		return
 	}
 	list, err := d.Scripts.ListEpisodes(r.Context(), session.UserID, scriptID)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, list)
@@ -145,17 +145,17 @@ func (d Deps) handleScriptEpisodes(w http.ResponseWriter, r *http.Request) {
 func (d Deps) handleEpisodeGet(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
-		WriteError(w, apperr.BadRequest("id 无效"))
+		WriteError(w, r, apperr.BadRequest("id 无效"))
 		return
 	}
 	vo, err := d.Scripts.GetEpisode(r.Context(), session.UserID, id)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, vo)
@@ -176,17 +176,17 @@ func (d Deps) handleEpisodeDelete(w http.ResponseWriter, r *http.Request) {
 func (d Deps) handleEpisodeScenes(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	episodeID, err := strconv.ParseInt(chi.URLParam(r, "episodeId"), 10, 64)
 	if err != nil || episodeID <= 0 {
-		WriteError(w, apperr.BadRequest("episodeId 无效"))
+		WriteError(w, r, apperr.BadRequest("episodeId 无效"))
 		return
 	}
 	list, err := d.Scripts.ListScenes(r.Context(), session.UserID, episodeID)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, list)
@@ -195,17 +195,17 @@ func (d Deps) handleEpisodeScenes(w http.ResponseWriter, r *http.Request) {
 func (d Deps) handleSceneGet(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
-		WriteError(w, apperr.BadRequest("id 无效"))
+		WriteError(w, r, apperr.BadRequest("id 无效"))
 		return
 	}
 	vo, err := d.Scripts.GetScene(r.Context(), session.UserID, id)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, vo)
@@ -226,16 +226,16 @@ func (d Deps) handleSceneDelete(w http.ResponseWriter, r *http.Request) {
 func (d Deps) handleChildCreate(w http.ResponseWriter, r *http.Request, resType resource.Type, parentField string) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	var req createChildReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, apperr.BadRequest("请求体无效"))
+		WriteError(w, r, apperr.BadRequest("请求体无效"))
 		return
 	}
 	if req.ParentID <= 0 {
-		WriteError(w, apperr.BadRequest("parentId 无效"))
+		WriteError(w, r, apperr.BadRequest("parentId 无效"))
 		return
 	}
 	fields := req.Fields
@@ -244,7 +244,7 @@ func (d Deps) handleChildCreate(w http.ResponseWriter, r *http.Request, resType 
 	}
 	for _, key := range []string{"scriptId", "episodeId", "parentVersion"} {
 		if _, exists := fields[key]; exists {
-			WriteError(w, apperr.BadRequest("父对象字段必须在请求顶层指定"))
+			WriteError(w, r, apperr.BadRequest("父对象字段必须在请求顶层指定"))
 			return
 		}
 	}
@@ -256,7 +256,7 @@ func (d Deps) handleChildCreate(w http.ResponseWriter, r *http.Request, resType 
 		Fields:  fields,
 	}, resource.Context{ActorUserID: session.UserID})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, receipt.Result)
@@ -265,12 +265,12 @@ func (d Deps) handleChildCreate(w http.ResponseWriter, r *http.Request, resType 
 func (d Deps) handleResourcePatch(w http.ResponseWriter, r *http.Request, resType resource.Type) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	var req patchResourceReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteError(w, apperr.BadRequest("请求体无效"))
+		WriteError(w, r, apperr.BadRequest("请求体无效"))
 		return
 	}
 	receipt, err := d.Commands.Execute(r.Context(), resource.PatchCommand{
@@ -281,7 +281,7 @@ func (d Deps) handleResourcePatch(w http.ResponseWriter, r *http.Request, resTyp
 		Patch:   req.Patch,
 	}, resource.Context{ActorUserID: session.UserID})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, receipt.Result)
@@ -290,17 +290,17 @@ func (d Deps) handleResourcePatch(w http.ResponseWriter, r *http.Request, resTyp
 func (d Deps) handleResourceDelete(w http.ResponseWriter, r *http.Request, resType resource.Type) {
 	session, ok := auth.SessionFrom(r.Context())
 	if !ok {
-		WriteError(w, apperr.Unauthorized("未登录或登录已过期"))
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
 		return
 	}
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
-		WriteError(w, apperr.BadRequest("id 无效"))
+		WriteError(w, r, apperr.BadRequest("id 无效"))
 		return
 	}
 	version, err := strconv.Atoi(r.URL.Query().Get("version"))
 	if err != nil || version < 0 {
-		WriteError(w, apperr.BadRequest("version 无效"))
+		WriteError(w, r, apperr.BadRequest("version 无效"))
 		return
 	}
 	requestID := r.URL.Query().Get("requestId")
@@ -311,7 +311,7 @@ func (d Deps) handleResourceDelete(w http.ResponseWriter, r *http.Request, resTy
 		Version: int32(version),
 	}, resource.Context{ActorUserID: session.UserID})
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, r, err)
 		return
 	}
 	WriteOK(w, true)
