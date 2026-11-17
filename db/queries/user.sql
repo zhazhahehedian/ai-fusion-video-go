@@ -29,3 +29,18 @@ SELECT
   update_time
 FROM sys_user
 WHERE username = ? AND deleted = 0;
+
+-- name: CreateUser :execlastid
+INSERT INTO sys_user (
+  username,
+  password,
+  nickname,
+  status,
+  deleted
+) VALUES (
+  ?,
+  ?,
+  ?,
+  1,
+  0
+);

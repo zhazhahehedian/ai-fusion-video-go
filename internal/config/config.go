@@ -17,6 +17,8 @@ type Config struct {
 	RedisPassword string
 	RedisDB       int
 
+	FFmpegPath string
+
 	DBMaxOpenConns    int
 	DBMaxIdleConns    int
 	DBConnMaxLifetime time.Duration
@@ -29,6 +31,7 @@ func Load() (Config, error) {
 		RedisAddr:         getenv("REDIS_ADDR", "127.0.0.1:46379"),
 		RedisPassword:     getenv("REDIS_PASSWORD", "123456"),
 		RedisDB:           0,
+		FFmpegPath:        getenv("FFMPEG_PATH", "ffmpeg"),
 		DBMaxOpenConns:    10,
 		DBMaxIdleConns:    5,
 		DBConnMaxLifetime: 30 * time.Minute,

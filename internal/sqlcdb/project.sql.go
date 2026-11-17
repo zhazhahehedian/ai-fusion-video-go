@@ -7,11 +7,28 @@ package sqlcdb
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+	"time"
 )
 
-const getProjectByID = `-- name: GetProjectByID :one
-SELECT
-  id,
+const countOwnedProjects = `-- name: CountOwnedProjects :one
+SELECT COUNT(*)
+FROM afv_project
+WHERE deleted = 0
+  AND owner_type = 1
+  AND owner_id = ?
+`
+
+func (q *Queries) CountOwnedProjects(ctx context.Context, ownerID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countOwnedProjects, ownerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createOwnedProject = `-- name: CreateOwnedProject :execlastid
+INSERT INTO afv_project (
   name,
   description,
   cover_url,
@@ -24,16 +41,110 @@ SELECT
   art_style_description,
   art_style_image_prompt,
   art_style_image_url,
+  version,
+  deleted
+) VALUES (
+  ?,
+  ?,
+  ?,
+  2,
+  1,
+  ?,
+  0,
+  ?,
+  ?,
+  ?,
+  ?,
+  ?,
+  0,
+  0
+)
+`
+
+type CreateOwnedProjectParams struct {
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	CoverUrl            sql.NullString  `json:"cover_url"`
+	OwnerID             int64           `json:"owner_id"`
+	Properties          json.RawMessage `json:"properties"`
+	ArtStyle            sql.NullString  `json:"art_style"`
+	ArtStyleDescription sql.NullString  `json:"art_style_description"`
+	ArtStyleImagePrompt sql.NullString  `json:"art_style_image_prompt"`
+	ArtStyleImageUrl    sql.NullString  `json:"art_style_image_url"`
+}
+
+// 阶段3：项目行创建（幂等与 ensure script 由 resource 命令管道负责）
+func (q *Queries) CreateOwnedProject(ctx context.Context, arg CreateOwnedProjectParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, createOwnedProject,
+		arg.Name,
+		arg.Description,
+		arg.CoverUrl,
+		arg.OwnerID,
+		arg.Properties,
+		arg.ArtStyle,
+		arg.ArtStyleDescription,
+		arg.ArtStyleImagePrompt,
+		arg.ArtStyleImageUrl,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const getOwnedProjectByID = `-- name: GetOwnedProjectByID :one
+SELECT
+  id,
+  name,
+  description,
+  cover_url,
+  scope,
+  owner_type,
+  owner_id,
+  status,
+  COALESCE(properties, CAST('{}' AS JSON)) AS properties,
+  art_style,
+  art_style_description,
+  art_style_image_prompt,
+  art_style_image_url,
+  version,
   deleted,
   create_time,
   update_time
 FROM afv_project
 WHERE id = ? AND deleted = 0
+  AND owner_type = 1
+  AND owner_id = ?
 `
 
-func (q *Queries) GetProjectByID(ctx context.Context, id int64) (AfvProject, error) {
-	row := q.db.QueryRowContext(ctx, getProjectByID, id)
-	var i AfvProject
+type GetOwnedProjectByIDParams struct {
+	ID      int64 `json:"id"`
+	OwnerID int64 `json:"owner_id"`
+}
+
+type GetOwnedProjectByIDRow struct {
+	ID                  int64           `json:"id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	CoverUrl            sql.NullString  `json:"cover_url"`
+	Scope               sql.NullInt32   `json:"scope"`
+	OwnerType           int32           `json:"owner_type"`
+	OwnerID             int64           `json:"owner_id"`
+	Status              sql.NullInt32   `json:"status"`
+	Properties          json.RawMessage `json:"properties"`
+	ArtStyle            sql.NullString  `json:"art_style"`
+	ArtStyleDescription sql.NullString  `json:"art_style_description"`
+	ArtStyleImagePrompt sql.NullString  `json:"art_style_image_prompt"`
+	ArtStyleImageUrl    sql.NullString  `json:"art_style_image_url"`
+	Version             int32           `json:"version"`
+	Deleted             int8            `json:"deleted"`
+	CreateTime          time.Time       `json:"create_time"`
+	UpdateTime          time.Time       `json:"update_time"`
+}
+
+func (q *Queries) GetOwnedProjectByID(ctx context.Context, arg GetOwnedProjectByIDParams) (GetOwnedProjectByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getOwnedProjectByID, arg.ID, arg.OwnerID)
+	var i GetOwnedProjectByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -48,6 +159,7 @@ func (q *Queries) GetProjectByID(ctx context.Context, id int64) (AfvProject, err
 		&i.ArtStyleDescription,
 		&i.ArtStyleImagePrompt,
 		&i.ArtStyleImageUrl,
+		&i.Version,
 		&i.Deleted,
 		&i.CreateTime,
 		&i.UpdateTime,
@@ -55,7 +167,7 @@ func (q *Queries) GetProjectByID(ctx context.Context, id int64) (AfvProject, err
 	return i, err
 }
 
-const listProjects = `-- name: ListProjects :many
+const getProjectByID = `-- name: GetProjectByID :one
 SELECT
   id,
   name,
@@ -65,34 +177,119 @@ SELECT
   owner_type,
   owner_id,
   status,
-  properties,
+  COALESCE(properties, CAST('{}' AS JSON)) AS properties,
   art_style,
   art_style_description,
   art_style_image_prompt,
   art_style_image_url,
+  version,
+  deleted,
+  create_time,
+  update_time
+FROM afv_project
+WHERE id = ? AND deleted = 0
+`
+
+type GetProjectByIDRow struct {
+	ID                  int64           `json:"id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	CoverUrl            sql.NullString  `json:"cover_url"`
+	Scope               sql.NullInt32   `json:"scope"`
+	OwnerType           int32           `json:"owner_type"`
+	OwnerID             int64           `json:"owner_id"`
+	Status              sql.NullInt32   `json:"status"`
+	Properties          json.RawMessage `json:"properties"`
+	ArtStyle            sql.NullString  `json:"art_style"`
+	ArtStyleDescription sql.NullString  `json:"art_style_description"`
+	ArtStyleImagePrompt sql.NullString  `json:"art_style_image_prompt"`
+	ArtStyleImageUrl    sql.NullString  `json:"art_style_image_url"`
+	Version             int32           `json:"version"`
+	Deleted             int8            `json:"deleted"`
+	CreateTime          time.Time       `json:"create_time"`
+	UpdateTime          time.Time       `json:"update_time"`
+}
+
+func (q *Queries) GetProjectByID(ctx context.Context, id int64) (GetProjectByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getProjectByID, id)
+	var i GetProjectByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.CoverUrl,
+		&i.Scope,
+		&i.OwnerType,
+		&i.OwnerID,
+		&i.Status,
+		&i.Properties,
+		&i.ArtStyle,
+		&i.ArtStyleDescription,
+		&i.ArtStyleImagePrompt,
+		&i.ArtStyleImageUrl,
+		&i.Version,
+		&i.Deleted,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
+}
+
+const listAllOwnedProjects = `-- name: ListAllOwnedProjects :many
+SELECT
+  id,
+  name,
+  description,
+  cover_url,
+  scope,
+  owner_type,
+  owner_id,
+  status,
+  COALESCE(properties, CAST('{}' AS JSON)) AS properties,
+  art_style,
+  art_style_description,
+  art_style_image_prompt,
+  art_style_image_url,
+  version,
   deleted,
   create_time,
   update_time
 FROM afv_project
 WHERE deleted = 0
-ORDER BY id DESC
-LIMIT ? OFFSET ?
+  AND owner_type = 1
+  AND owner_id = ?
+ORDER BY update_time DESC, id DESC
 `
 
-type ListProjectsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+type ListAllOwnedProjectsRow struct {
+	ID                  int64           `json:"id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	CoverUrl            sql.NullString  `json:"cover_url"`
+	Scope               sql.NullInt32   `json:"scope"`
+	OwnerType           int32           `json:"owner_type"`
+	OwnerID             int64           `json:"owner_id"`
+	Status              sql.NullInt32   `json:"status"`
+	Properties          json.RawMessage `json:"properties"`
+	ArtStyle            sql.NullString  `json:"art_style"`
+	ArtStyleDescription sql.NullString  `json:"art_style_description"`
+	ArtStyleImagePrompt sql.NullString  `json:"art_style_image_prompt"`
+	ArtStyleImageUrl    sql.NullString  `json:"art_style_image_url"`
+	Version             int32           `json:"version"`
+	Deleted             int8            `json:"deleted"`
+	CreateTime          time.Time       `json:"create_time"`
+	UpdateTime          time.Time       `json:"update_time"`
 }
 
-func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]AfvProject, error) {
-	rows, err := q.db.QueryContext(ctx, listProjects, arg.Limit, arg.Offset)
+func (q *Queries) ListAllOwnedProjects(ctx context.Context, ownerID int64) ([]ListAllOwnedProjectsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAllOwnedProjects, ownerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []AfvProject{}
+	items := []ListAllOwnedProjectsRow{}
 	for rows.Next() {
-		var i AfvProject
+		var i ListAllOwnedProjectsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -107,6 +304,7 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]A
 			&i.ArtStyleDescription,
 			&i.ArtStyleImagePrompt,
 			&i.ArtStyleImageUrl,
+			&i.Version,
 			&i.Deleted,
 			&i.CreateTime,
 			&i.UpdateTime,
@@ -122,4 +320,266 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]A
 		return nil, err
 	}
 	return items, nil
+}
+
+const listOwnedProjects = `-- name: ListOwnedProjects :many
+SELECT
+  id,
+  name,
+  description,
+  cover_url,
+  scope,
+  owner_type,
+  owner_id,
+  status,
+  COALESCE(properties, CAST('{}' AS JSON)) AS properties,
+  art_style,
+  art_style_description,
+  art_style_image_prompt,
+  art_style_image_url,
+  version,
+  deleted,
+  create_time,
+  update_time
+FROM afv_project
+WHERE deleted = 0
+  AND owner_type = 1
+  AND owner_id = ?
+ORDER BY update_time DESC, id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListOwnedProjectsParams struct {
+	OwnerID int64 `json:"owner_id"`
+	Limit   int32 `json:"limit"`
+	Offset  int32 `json:"offset"`
+}
+
+type ListOwnedProjectsRow struct {
+	ID                  int64           `json:"id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	CoverUrl            sql.NullString  `json:"cover_url"`
+	Scope               sql.NullInt32   `json:"scope"`
+	OwnerType           int32           `json:"owner_type"`
+	OwnerID             int64           `json:"owner_id"`
+	Status              sql.NullInt32   `json:"status"`
+	Properties          json.RawMessage `json:"properties"`
+	ArtStyle            sql.NullString  `json:"art_style"`
+	ArtStyleDescription sql.NullString  `json:"art_style_description"`
+	ArtStyleImagePrompt sql.NullString  `json:"art_style_image_prompt"`
+	ArtStyleImageUrl    sql.NullString  `json:"art_style_image_url"`
+	Version             int32           `json:"version"`
+	Deleted             int8            `json:"deleted"`
+	CreateTime          time.Time       `json:"create_time"`
+	UpdateTime          time.Time       `json:"update_time"`
+}
+
+// 阶段2：仅个人拥有者可见（团队/成员 ACL 见技术债）
+func (q *Queries) ListOwnedProjects(ctx context.Context, arg ListOwnedProjectsParams) ([]ListOwnedProjectsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listOwnedProjects, arg.OwnerID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOwnedProjectsRow{}
+	for rows.Next() {
+		var i ListOwnedProjectsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.CoverUrl,
+			&i.Scope,
+			&i.OwnerType,
+			&i.OwnerID,
+			&i.Status,
+			&i.Properties,
+			&i.ArtStyle,
+			&i.ArtStyleDescription,
+			&i.ArtStyleImagePrompt,
+			&i.ArtStyleImageUrl,
+			&i.Version,
+			&i.Deleted,
+			&i.CreateTime,
+			&i.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjects = `-- name: ListProjects :many
+SELECT
+  id,
+  name,
+  description,
+  cover_url,
+  scope,
+  owner_type,
+  owner_id,
+  status,
+  COALESCE(properties, CAST('{}' AS JSON)) AS properties,
+  art_style,
+  art_style_description,
+  art_style_image_prompt,
+  art_style_image_url,
+  version,
+  deleted,
+  create_time,
+  update_time
+FROM afv_project
+WHERE deleted = 0
+ORDER BY id DESC
+LIMIT ? OFFSET ?
+`
+
+type ListProjectsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type ListProjectsRow struct {
+	ID                  int64           `json:"id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	CoverUrl            sql.NullString  `json:"cover_url"`
+	Scope               sql.NullInt32   `json:"scope"`
+	OwnerType           int32           `json:"owner_type"`
+	OwnerID             int64           `json:"owner_id"`
+	Status              sql.NullInt32   `json:"status"`
+	Properties          json.RawMessage `json:"properties"`
+	ArtStyle            sql.NullString  `json:"art_style"`
+	ArtStyleDescription sql.NullString  `json:"art_style_description"`
+	ArtStyleImagePrompt sql.NullString  `json:"art_style_image_prompt"`
+	ArtStyleImageUrl    sql.NullString  `json:"art_style_image_url"`
+	Version             int32           `json:"version"`
+	Deleted             int8            `json:"deleted"`
+	CreateTime          time.Time       `json:"create_time"`
+	UpdateTime          time.Time       `json:"update_time"`
+}
+
+func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]ListProjectsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listProjects, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectsRow{}
+	for rows.Next() {
+		var i ListProjectsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.CoverUrl,
+			&i.Scope,
+			&i.OwnerType,
+			&i.OwnerID,
+			&i.Status,
+			&i.Properties,
+			&i.ArtStyle,
+			&i.ArtStyleDescription,
+			&i.ArtStyleImagePrompt,
+			&i.ArtStyleImageUrl,
+			&i.Version,
+			&i.Deleted,
+			&i.CreateTime,
+			&i.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockOwnedProjectByID = `-- name: LockOwnedProjectByID :one
+SELECT
+  id,
+  name,
+  description,
+  cover_url,
+  scope,
+  owner_type,
+  owner_id,
+  status,
+  COALESCE(properties, CAST('{}' AS JSON)) AS properties,
+  art_style,
+  art_style_description,
+  art_style_image_prompt,
+  art_style_image_url,
+  version,
+  deleted,
+  create_time,
+  update_time
+FROM afv_project
+WHERE id = ? AND deleted = 0
+  AND owner_type = 1
+  AND owner_id = ?
+FOR UPDATE
+`
+
+type LockOwnedProjectByIDParams struct {
+	ID      int64 `json:"id"`
+	OwnerID int64 `json:"owner_id"`
+}
+
+type LockOwnedProjectByIDRow struct {
+	ID                  int64           `json:"id"`
+	Name                string          `json:"name"`
+	Description         sql.NullString  `json:"description"`
+	CoverUrl            sql.NullString  `json:"cover_url"`
+	Scope               sql.NullInt32   `json:"scope"`
+	OwnerType           int32           `json:"owner_type"`
+	OwnerID             int64           `json:"owner_id"`
+	Status              sql.NullInt32   `json:"status"`
+	Properties          json.RawMessage `json:"properties"`
+	ArtStyle            sql.NullString  `json:"art_style"`
+	ArtStyleDescription sql.NullString  `json:"art_style_description"`
+	ArtStyleImagePrompt sql.NullString  `json:"art_style_image_prompt"`
+	ArtStyleImageUrl    sql.NullString  `json:"art_style_image_url"`
+	Version             int32           `json:"version"`
+	Deleted             int8            `json:"deleted"`
+	CreateTime          time.Time       `json:"create_time"`
+	UpdateTime          time.Time       `json:"update_time"`
+}
+
+func (q *Queries) LockOwnedProjectByID(ctx context.Context, arg LockOwnedProjectByIDParams) (LockOwnedProjectByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, lockOwnedProjectByID, arg.ID, arg.OwnerID)
+	var i LockOwnedProjectByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.CoverUrl,
+		&i.Scope,
+		&i.OwnerType,
+		&i.OwnerID,
+		&i.Status,
+		&i.Properties,
+		&i.ArtStyle,
+		&i.ArtStyleDescription,
+		&i.ArtStyleImagePrompt,
+		&i.ArtStyleImageUrl,
+		&i.Version,
+		&i.Deleted,
+		&i.CreateTime,
+		&i.UpdateTime,
+	)
+	return i, err
 }

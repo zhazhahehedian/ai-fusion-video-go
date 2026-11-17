@@ -9,11 +9,22 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/redis/go-redis/v9"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/auth"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/generation"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/media"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/project"
+	"github.com/zhazhahehedian/ai-fusion-video-go/internal/resource"
 )
 
 type Deps struct {
-	DB    *sql.DB
-	Redis *redis.Client
+	DB         *sql.DB
+	Redis      *redis.Client
+	Auth       *auth.Service
+	Projects   *project.Service
+	Commands   *resource.Service
+	Scripts    *resource.ScriptQuery
+	Generation *generation.Service
+	Media      *media.Service
 }
 
 func NewRouter(deps Deps) http.Handler {
@@ -24,6 +35,47 @@ func NewRouter(deps Deps) http.Handler {
 	r.Use(middleware.Recoverer)
 
 	r.Get("/healthz", deps.handleHealthz)
+
+	r.Route("/api/auth", func(ar chi.Router) {
+		ar.Post("/login", deps.handleLogin)
+		ar.Post("/register", deps.handleRegister)
+		ar.Post("/refresh", deps.handleRefresh)
+		ar.Group(func(pr chi.Router) {
+			pr.Use(deps.RequireAuth)
+			pr.Post("/logout", deps.handleLogout)
+			pr.Get("/user-info", deps.handleUserInfo)
+		})
+	})
+
+	r.Group(func(pr chi.Router) {
+		pr.Use(deps.RequireAuth)
+		pr.Get("/api/project/page", deps.handleProjectPage)
+		pr.Get("/api/project/list", deps.handleProjectList)
+		pr.Post("/api/project", deps.handleProjectCreate)
+
+		// 具体前缀先于 /api/script/{id}，避免 episode/scene/project 被吞掉
+		pr.Get("/api/script/project/{projectId}", deps.handleScriptByProject)
+		pr.Get("/api/script/episode/{episodeId}/scenes", deps.handleEpisodeScenes)
+		pr.Get("/api/script/episode/{id}", deps.handleEpisodeGet)
+		pr.Post("/api/script/episode", deps.handleEpisodeCreate)
+		pr.Put("/api/script/episode", deps.handleEpisodeUpdate)
+		pr.Delete("/api/script/episode/{id}", deps.handleEpisodeDelete)
+		pr.Get("/api/script/scene/{id}", deps.handleSceneGet)
+		pr.Post("/api/script/scene", deps.handleSceneCreate)
+		pr.Put("/api/script/scene", deps.handleSceneUpdate)
+		pr.Delete("/api/script/scene/{id}", deps.handleSceneDelete)
+		pr.Get("/api/script/{scriptId}/episodes", deps.handleScriptEpisodes)
+		pr.Put("/api/script/{id}/source", deps.handleScriptReplaceSource)
+		pr.Get("/api/script/{id}", deps.handleScriptGet)
+		pr.Put("/api/script", deps.handleScriptUpdate)
+
+		pr.Post("/api/generation/echo", deps.handleGenerationEcho)
+		pr.Get("/api/generation/submissions/{id}", deps.handleGenerationSubmissionGet)
+
+		pr.Post("/api/media/jobs", deps.handleMediaEnqueue)
+		pr.Get("/api/media/jobs/{id}", deps.handleMediaJobGet)
+	})
+
 	return r
 }
 

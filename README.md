@@ -38,4 +38,6 @@ bash scripts/run-server.sh
 curl -s http://127.0.0.1:18080/healthz
 ```
 
-`/healthz` 会探活 MySQL 与 Redis。阶段1已包含 `sys_user` / `afv_project` 迁移与 sqlc 生成代码（尚无业务路由）。
+`/healthz` 会探活 MySQL 与 Redis。
+
+当前进度：阶段3资源命令管道已完成；阶段4异步生成任务（MySQL 租约队列 + worker）进行中，见 `dev-docs/2-in-progress/`。

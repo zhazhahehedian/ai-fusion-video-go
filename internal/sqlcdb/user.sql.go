@@ -7,7 +7,38 @@ package sqlcdb
 
 import (
 	"context"
+	"database/sql"
 )
+
+const createUser = `-- name: CreateUser :execlastid
+INSERT INTO sys_user (
+  username,
+  password,
+  nickname,
+  status,
+  deleted
+) VALUES (
+  ?,
+  ?,
+  ?,
+  1,
+  0
+)
+`
+
+type CreateUserParams struct {
+	Username string         `json:"username"`
+	Password string         `json:"password"`
+	Nickname sql.NullString `json:"nickname"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, createUser, arg.Username, arg.Password, arg.Nickname)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
 
 const getUserByID = `-- name: GetUserByID :one
 SELECT

@@ -10,6 +10,164 @@ import (
 	"time"
 )
 
+// 业务任务可靠投递发件箱
+type AfvAsyncOutbox struct {
+	// 投递记录标识
+	ID int64 `json:"id"`
+	// 事件幂等标识
+	EventKey string `json:"event_key"`
+	// 已登记投递类型
+	EventType string `json:"event_type"`
+	// 关联聚合标识
+	AggregateID string `json:"aggregate_id"`
+	// 不含凭据的投递内容
+	PayloadJson json.RawMessage `json:"payload_json"`
+	// 待投递或已投递
+	State string `json:"state"`
+	// 投递尝试次数
+	Attempts int32 `json:"attempts"`
+	// 下次投递时间（UTC）
+	NextAttemptAt time.Time `json:"next_attempt_at"`
+	// 最近投递错误
+	LastError sql.NullString `json:"last_error"`
+	// 与业务状态一起提交的创建时间（UTC）
+	CreatedAt time.Time `json:"created_at"`
+	// 投递确认时间（UTC）
+	DeliveredAt sql.NullTime `json:"delivered_at"`
+}
+
+// 外部副作用意图、回执与人工核实审计
+type AfvGenerationAttempt struct {
+	// 提交尝试标识
+	ID string `json:"id"`
+	// 远端执行记录
+	JobID string `json:"job_id"`
+	// 经明确决策创建的尝试序号
+	AttemptNo int32 `json:"attempt_no"`
+	// 可查询协议的预备请求检查点
+	RequestJson json.RawMessage `json:"request_json"`
+	// 不可变供应商受理回执
+	ProviderTaskID sql.NullString `json:"provider_task_id"`
+	// 同步供应商的不可变响应结果
+	ResultJson json.RawMessage `json:"result_json"`
+	// 未知受理的核实结论
+	Resolution sql.NullString `json:"resolution"`
+	// 核实依据与明确重试说明
+	ResolutionNote sql.NullString `json:"resolution_note"`
+	// 作出核实决定的用户
+	ResolvedBy sql.NullInt64 `json:"resolved_by"`
+	// 调用前提交意图时间（UTC）
+	CreatedAt time.Time `json:"created_at"`
+	// 准备完成后、付费调用之前提交的意图时间（UTC）
+	SubmittedAt sql.NullTime `json:"submitted_at"`
+	// 回执入库时间（UTC）
+	AcknowledgedAt sql.NullTime `json:"acknowledged_at"`
+	// 核实决定时间（UTC）
+	ResolvedAt sql.NullTime `json:"resolved_at"`
+}
+
+// 跨实例生成额度与事件顺序的短事务锁
+type AfvGenerationDispatchLock struct {
+	// 全局额度检查锁标识
+	ID int32 `json:"id"`
+	// 调度版本
+	Version int64 `json:"version"`
+}
+
+// 生成任务原子受理与幂等回执
+type AfvGenerationSubmission struct {
+	// 受理记录标识
+	ID string `json:"id"`
+	// 调用方幂等标识
+	RequestID string `json:"request_id"`
+	// 用户团队与入口作用域摘要
+	ScopeKey string `json:"scope_key"`
+	// 规范化请求摘要
+	RequestHash string `json:"request_hash"`
+	// 生成类别
+	Kind string `json:"kind"`
+	// 业务任务数据库标识
+	TaskID int64 `json:"task_id"`
+	// 业务任务公开标识
+	PublicTaskID string `json:"public_task_id"`
+	// 发起用户
+	ActorUserID int64 `json:"actor_user_id"`
+	// 发起团队上下文
+	ActorTeamID sql.NullInt64 `json:"actor_team_id"`
+	// 所属项目
+	ProjectID sql.NullInt64 `json:"project_id"`
+	// 画布节点运行标识
+	CanvasNodeRunID sql.NullString `json:"canvas_node_run_id"`
+	// 经校验的内部执行身份
+	ContextJson json.RawMessage `json:"context_json"`
+	// 模型与能力的不可变快照
+	ModelSnapshotJson json.RawMessage `json:"model_snapshot_json"`
+	// 供应商配置标识
+	ApiConfigID int64 `json:"api_config_id"`
+	// 供应商配置一致性摘要
+	ApiConfigHash string `json:"api_config_hash"`
+	// 受理及聚合执行状态
+	State string `json:"state"`
+	// 是否请求停止后续执行
+	CancelRequested bool `json:"cancel_requested"`
+	// 状态版本
+	Revision int64 `json:"revision"`
+	// 受理时间（UTC）
+	CreatedAt time.Time `json:"created_at"`
+	// 最近状态变化时间（UTC）
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// 可恢复媒体处理任务
+type AfvMediaJob struct {
+	// 媒体任务标识
+	ID string `json:"id"`
+	// 任务类型
+	Kind string `json:"kind"`
+	// 项目标识，独立任务可为空
+	ProjectID sql.NullInt64 `json:"project_id"`
+	// 需要正式写回的业务对象标识
+	TargetID sql.NullInt64 `json:"target_id"`
+	// 等待写回的业务版本
+	TargetVersion sql.NullInt32 `json:"target_version"`
+	// 发起用户
+	ActorUserID int64 `json:"actor_user_id"`
+	// 客户端幂等请求标识
+	RequestID string `json:"request_id"`
+	// 请求与身份摘要
+	RequestHash string `json:"request_hash"`
+	// 经认证的执行上下文
+	ContextJson json.RawMessage `json:"context_json"`
+	// 固定的输入来源版本与参数
+	InputJson json.RawMessage `json:"input_json"`
+	// 已持久化的阶段结果
+	CheckpointJson json.RawMessage `json:"checkpoint_json"`
+	// 任务状态
+	Status string `json:"status"`
+	// 当前处理阶段
+	Phase string `json:"phase"`
+	// 终止或待处理原因
+	ErrorMsg sql.NullString `json:"error_msg"`
+	// 当前执行实例
+	OwnerInstanceID sql.NullString `json:"owner_instance_id"`
+	// 执行代数
+	OwnerEpoch int64 `json:"owner_epoch"`
+	// 执行租约截止时间
+	LeaseUntil sql.NullTime `json:"lease_until"`
+	// 下次执行时间
+	NextRunAt time.Time `json:"next_run_at"`
+	// 任务总时限
+	DeadlineAt time.Time `json:"deadline_at"`
+	// 是否请求取消
+	CancelRequested bool `json:"cancel_requested"`
+	// 状态版本
+	Revision int64 `json:"revision"`
+	// 创建时间
+	CreatedAt time.Time `json:"created_at"`
+	// 更新时间
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // 视频项目表
 type AfvProject struct {
 	// 主键ID
@@ -38,6 +196,252 @@ type AfvProject struct {
 	ArtStyleImagePrompt sql.NullString `json:"art_style_image_prompt"`
 	// 画风参考图路径
 	ArtStyleImageUrl sql.NullString `json:"art_style_image_url"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间
+	UpdateTime time.Time `json:"update_time"`
+	// 业务内容版本
+	Version int32 `json:"version"`
+}
+
+// 单次供应商请求与可恢复执行状态
+type AfvRemoteGenerationJob struct {
+	// 远端执行记录标识
+	ID string `json:"id"`
+	// 所属受理记录
+	SubmissionID string `json:"submission_id"`
+	// 对应的结果条目标识
+	ItemID int64 `json:"item_id"`
+	// 请求中的稳定结果顺序
+	ItemIndex int32 `json:"item_index"`
+	// 占用额度的模型
+	ModelID int64 `json:"model_id"`
+	// 占用额度的用户
+	ActorUserID int64 `json:"actor_user_id"`
+	// 占用额度的项目
+	ProjectID sql.NullInt64 `json:"project_id"`
+	// 远端执行状态
+	State string `json:"state"`
+	// 当前持久化执行阶段
+	Phase string `json:"phase"`
+	// 供应商受理标识
+	ProviderTaskID sql.NullString `json:"provider_task_id"`
+	// 当前显式提交尝试标识
+	ActiveAttemptID sql.NullString `json:"active_attempt_id"`
+	// 固定生成参数与稳定媒体引用
+	InputJson json.RawMessage `json:"input_json"`
+	// 供应商结果接收检查点
+	ResultJson json.RawMessage `json:"result_json"`
+	// 是否请求远端取消
+	CancelRequested bool `json:"cancel_requested"`
+	// 是否已发送远端取消请求
+	CancelSent bool `json:"cancel_sent"`
+	// 是否仍占用远端并发额度
+	PermitHeld bool `json:"permit_held"`
+	// 当前工作者实例
+	OwnerInstanceID sql.NullString `json:"owner_instance_id"`
+	// 工作者领取代数
+	OwnerEpoch int64 `json:"owner_epoch"`
+	// 租约到期时间（UTC）
+	LeaseUntil sql.NullTime `json:"lease_until"`
+	// 下次执行时间（UTC）
+	NextPollAt time.Time `json:"next_poll_at"`
+	// 自动等待截止时间（UTC）
+	DeadlineAt time.Time `json:"deadline_at"`
+	// 单次查询累计次数
+	PollAttempts int32 `json:"poll_attempts"`
+	// 连续传输错误次数
+	ConsecutiveErrors int32 `json:"consecutive_errors"`
+	// 稳定错误码
+	ErrorCode sql.NullString `json:"error_code"`
+	// 用户可读执行原因
+	ErrorMessage sql.NullString `json:"error_message"`
+	// 状态版本
+	Revision int64 `json:"revision"`
+	// 创建时间（UTC）
+	CreatedAt time.Time `json:"created_at"`
+	// 最近变更时间（UTC）
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// 跨页面与智能体共用的业务命令审计
+type AfvResourceCommand struct {
+	// 业务命令标识
+	ID string `json:"id"`
+	// 经过认证的操作用户编号
+	ActorUserID int64 `json:"actor_user_id"`
+	// 用户作用域内的幂等标识
+	RequestID string `json:"request_id"`
+	// 命令内容与执行作用域摘要
+	RequestHash string `json:"request_hash"`
+	// 命令来源
+	Origin string `json:"origin"`
+	// 发起命令的画布标识
+	CanvasID sql.NullString `json:"canvas_id"`
+	// 可信智能体运行标识
+	AgentRunID sql.NullString `json:"agent_run_id"`
+	// 可信工具调用标识
+	ToolCallID sql.NullString `json:"tool_call_id"`
+	// 已验证的业务命令内容
+	RequestJson json.RawMessage `json:"request_json"`
+	// 已提交的幂等回执
+	ResultJson json.RawMessage `json:"result_json"`
+	// 授权恢复所需的变更前值
+	UndoJson json.RawMessage `json:"undo_json"`
+	// 命令创建时间
+	CreateTime time.Time `json:"create_time"`
+	// 命令完成时间
+	CommittedAt sql.NullTime `json:"committed_at"`
+}
+
+// 业务内容前后版本与条件恢复依据
+type AfvResourceRevision struct {
+	// 所属已提交业务命令
+	CommandID string `json:"command_id"`
+	// 业务资源类型
+	ResourceType string `json:"resource_type"`
+	// 业务对象编号
+	ResourceID int64 `json:"resource_id"`
+	// 所属项目编号
+	ProjectID sql.NullInt64 `json:"project_id"`
+	// 本次命令提交后的对象版本
+	ResourceVersion int32 `json:"resource_version"`
+	// 修改前的完整业务内容，新增对象为空
+	BeforeJson json.RawMessage `json:"before_json"`
+	// 修改后的完整业务内容，包含删除状态
+	AfterJson json.RawMessage `json:"after_json"`
+	// 本次实际修改的业务字段
+	ChangedFields json.RawMessage `json:"changed_fields"`
+	// 版本记录时间
+	CreateTime time.Time `json:"create_time"`
+}
+
+// 剧本表
+type AfvScript struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属项目ID
+	ProjectID int64 `json:"project_id"`
+	// 剧本标题
+	Title sql.NullString `json:"title"`
+	// 剧本正文内容（格式化后）
+	Content sql.NullString `json:"content"`
+	// 剧本原始内容（用户粘贴的原文）
+	RawContent sql.NullString `json:"raw_content"`
+	// 总集数
+	TotalEpisodes sql.NullInt32 `json:"total_episodes"`
+	// 故事梗概
+	StorySynopsis sql.NullString `json:"story_synopsis"`
+	// 角色列表JSON
+	CharactersJson json.RawMessage `json:"characters_json"`
+	// 来源类型：0-手动创建 1-文件导入 2-AI生成
+	SourceType sql.NullInt32 `json:"source_type"`
+	// 解析状态：0-未解析 1-解析中 2-解析完成 3-解析失败
+	ParsingStatus sql.NullInt32 `json:"parsing_status"`
+	// 解析进度描述
+	ParsingProgress sql.NullString `json:"parsing_progress"`
+	// AI生成的剧本摘要
+	Summary sql.NullString `json:"summary"`
+	// 剧本类型/题材
+	Genre sql.NullString `json:"genre"`
+	// 目标受众
+	TargetAudience sql.NullString `json:"target_audience"`
+	// 预估总时长（分钟）
+	DurationEstimate sql.NullInt32 `json:"duration_estimate"`
+	// 可见范围：1-公开 2-私有 3-仅团队可见
+	Scope sql.NullInt32 `json:"scope"`
+	// 拥有者类型：1-个人 2-团队
+	OwnerType sql.NullInt32 `json:"owner_type"`
+	// 拥有者ID
+	OwnerID sql.NullInt64 `json:"owner_id"`
+	// 是否由AI生成
+	AiGenerated sql.NullInt16 `json:"ai_generated"`
+	// 乐观锁版本号
+	Version sql.NullInt32 `json:"version"`
+	// 状态：0-草稿 1-正常
+	Status sql.NullInt32 `json:"status"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// 分集剧本表
+type AfvScriptEpisode struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属剧本ID
+	ScriptID int64 `json:"script_id"`
+	// 集号（从1开始）
+	EpisodeNumber sql.NullInt32 `json:"episode_number"`
+	// 本集标题
+	Title sql.NullString `json:"title"`
+	// 本集剧情梗概
+	Synopsis sql.NullString `json:"synopsis"`
+	// 本集原始剧本内容
+	RawContent sql.NullString `json:"raw_content"`
+	// 预估时长（分钟）
+	DurationEstimate sql.NullInt32 `json:"duration_estimate"`
+	// 本集总场次数
+	TotalScenes sql.NullInt32 `json:"total_scenes"`
+	// 来源类型：0-AI解析 1-手动添加
+	SourceType sql.NullInt32 `json:"source_type"`
+	// 排列顺序
+	SortOrder sql.NullInt32 `json:"sort_order"`
+	// 解析状态：0-未解析 1-解析中 2-解析完成 3-解析失败
+	ParsingStatus sql.NullInt32 `json:"parsing_status"`
+	// 状态：0-草稿 1-正常
+	Status sql.NullInt32 `json:"status"`
+	// 乐观锁版本号
+	Version sql.NullInt32 `json:"version"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// 剧本分场次表
+type AfvScriptSceneItem struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属分集ID
+	EpisodeID int64 `json:"episode_id"`
+	// 所属剧本ID
+	ScriptID int64 `json:"script_id"`
+	// 场次编号（如1-1表示第1集第1场）
+	SceneNumber sql.NullString `json:"scene_number"`
+	// 场景标头（如"内景 客厅 夜"）
+	SceneHeading sql.NullString `json:"scene_heading"`
+	// 场景地点
+	Location sql.NullString `json:"location"`
+	// 时间段：日/夜/黄昏/清晨等
+	TimeOfDay sql.NullString `json:"time_of_day"`
+	// 内外景标识：内景/外景/内外景
+	IntExt sql.NullString `json:"int_ext"`
+	// 出场角色名列表JSON
+	Characters json.RawMessage `json:"characters"`
+	// 出场角色资产ID列表JSON
+	CharacterAssetIds json.RawMessage `json:"character_asset_ids"`
+	// 场景资产ID
+	SceneAssetID sql.NullInt64 `json:"scene_asset_id"`
+	// 道具资产ID列表JSON
+	PropAssetIds json.RawMessage `json:"prop_asset_ids"`
+	// 场景氛围/环境描述
+	SceneDescription sql.NullString `json:"scene_description"`
+	// 对白/动作元素列表JSON
+	Dialogues json.RawMessage `json:"dialogues"`
+	// 排列顺序
+	SortOrder sql.NullInt32 `json:"sort_order"`
+	// 状态：0-草稿 1-正常
+	Status sql.NullInt32 `json:"status"`
+	// 乐观锁版本号
+	Version sql.NullInt32 `json:"version"`
 	// 逻辑删除标志
 	Deleted int8 `json:"deleted"`
 	// 创建时间
