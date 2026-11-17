@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/sqlcdb"
@@ -18,6 +19,11 @@ type Repository struct {
 
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
+}
+
+// Now 读取数据库 UTC 时钟，截止时间判断不使用进程本地时钟。
+func (r *Repository) Now(ctx context.Context) (time.Time, error) {
+	return sqlcdb.New(r.db).DatabaseNow(ctx)
 }
 
 func (r *Repository) Claim(ctx context.Context, owner string) (*Job, error) {
@@ -152,21 +158,21 @@ func (r *Repository) finish(ctx context.Context, claim Claim, status, phase stri
 
 func mapJob(row sqlcdb.AfvMediaJob) Job {
 	job := Job{
-		ID:             row.ID,
-		Kind:           row.Kind,
-		ActorUserID:    row.ActorUserID,
-		RequestID:      row.RequestID,
-		RequestHash:    row.RequestHash,
-		InputJSON:      row.InputJson,
-		CheckpointJSON: row.CheckpointJson,
-		Status:         row.Status,
-		Phase:          row.Phase,
-		OwnerEpoch:     row.OwnerEpoch,
+		ID:              row.ID,
+		Kind:            row.Kind,
+		ActorUserID:     row.ActorUserID,
+		RequestID:       row.RequestID,
+		RequestHash:     row.RequestHash,
+		InputJSON:       row.InputJson,
+		CheckpointJSON:  row.CheckpointJson,
+		Status:          row.Status,
+		Phase:           row.Phase,
+		OwnerEpoch:      row.OwnerEpoch,
 		CancelRequested: row.CancelRequested,
-		Revision:       row.Revision,
-		DeadlineAt:     row.DeadlineAt,
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
+		Revision:        row.Revision,
+		DeadlineAt:      row.DeadlineAt,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
 	}
 	if row.ErrorMsg.Valid {
 		v := row.ErrorMsg.String

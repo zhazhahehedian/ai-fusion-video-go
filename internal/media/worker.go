@@ -89,7 +89,11 @@ func (w *Worker) runOne(ctx context.Context) error {
 	if job.CancelRequested {
 		return w.repo.Cancel(ctx, claim, "已取消", "任务在执行前被取消")
 	}
-	if time.Now().After(job.DeadlineAt) {
+	now, err := w.repo.Now(ctx)
+	if err != nil {
+		return err
+	}
+	if now.After(job.DeadlineAt) {
 		return w.repo.Fail(ctx, claim, "已超时", "媒体任务超过截止时间")
 	}
 

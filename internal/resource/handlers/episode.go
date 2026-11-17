@@ -3,6 +3,9 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"math"
+	"strconv"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/resource"
@@ -83,13 +86,29 @@ func (ScriptEpisodeCreate) Apply(ctx context.Context, q *sqlcdb.Queries, cmd res
 		}
 	}
 
+	title, err := optionalNullString(create.Fields["title"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	synopsis, err := optionalNullString(create.Fields["synopsis"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	rawContent, err := optionalNullString(create.Fields["rawContent"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	durationEstimate, err := optionalNullInt32(create.Fields["durationEstimate"])
+	if err != nil {
+		return resource.Mutation{}, err
+	}
 	id, err := q.CreateScriptEpisode(ctx, sqlcdb.CreateScriptEpisodeParams{
 		ScriptID:         scriptID,
 		EpisodeNumber:    sql.NullInt32{Int32: episodeNumber, Valid: true},
-		Title:            optionalNullString(create.Fields["title"]),
-		Synopsis:         optionalNullString(create.Fields["synopsis"]),
-		RawContent:       optionalNullString(create.Fields["rawContent"]),
-		DurationEstimate: optionalNullInt32(create.Fields["durationEstimate"]),
+		Title:            title,
+		Synopsis:         synopsis,
+		RawContent:       rawContent,
+		DurationEstimate: durationEstimate,
 		SourceType:       sql.NullInt32{Int32: sourceType, Valid: true},
 		SortOrder:        sql.NullInt32{Int32: sortOrder, Valid: true},
 		Status:           sql.NullInt32{Int32: status, Valid: true},
@@ -207,13 +226,25 @@ func (ScriptEpisodePatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd reso
 			}
 			episodeNumber = sql.NullInt32{Int32: n, Valid: true}
 		case "title":
-			title = optionalNullString(value)
+			title, err = optionalNullString(value)
+			if err != nil {
+				return resource.Mutation{}, err
+			}
 		case "synopsis":
-			synopsis = optionalNullString(value)
+			synopsis, err = optionalNullString(value)
+			if err != nil {
+				return resource.Mutation{}, err
+			}
 		case "rawContent":
-			rawContent = optionalNullString(value)
+			rawContent, err = optionalNullString(value)
+			if err != nil {
+				return resource.Mutation{}, err
+			}
 		case "durationEstimate":
-			durationEstimate = optionalNullInt32(value)
+			durationEstimate, err = optionalNullInt32(value)
+			if err != nil {
+				return resource.Mutation{}, err
+			}
 		case "sourceType":
 			n, err := requiredNonNegInt(value, "sourceType")
 			if err != nil {
@@ -415,6 +446,9 @@ func requiredPositiveInt(v any, field string) (int32, error) {
 	if err != nil || n < 1 {
 		return 0, apperr.BadRequest(field + " 无效")
 	}
+	if n > math.MaxInt32 {
+		return 0, apperr.BadRequest(field + " 超出范围")
+	}
 	return int32(n), nil
 }
 
@@ -422,6 +456,9 @@ func requiredNonNegInt(v any, field string) (int32, error) {
 	n, err := asInt64Value(v)
 	if err != nil || n < 0 {
 		return 0, apperr.BadRequest(field + " 无效")
+	}
+	if n > math.MaxInt32 {
+		return 0, apperr.BadRequest(field + " 超出范围")
 	}
 	return int32(n), nil
 }
@@ -434,13 +471,37 @@ func asInt64Value(v any) (int64, error) {
 		return int64(n), nil
 	case int64:
 		return n, nil
+	case float32:
+		return integralInt64(float64(n))
 	case float64:
-		return int64(n), nil
+		return integralInt64(n)
 	case jsonNumber:
-		return n.Int64()
+		out, err := n.Int64()
+		if err != nil {
+			if errors.Is(err, strconv.ErrRange) {
+				return 0, apperr.BadRequest("数值超出范围")
+			}
+			return 0, apperr.BadRequest("数值必须是整数")
+		}
+		return out, nil
 	default:
 		return 0, apperr.BadRequest("数值无效")
 	}
+}
+
+func integralInt64(n float64) (int64, error) {
+	if math.IsNaN(n) || math.IsInf(n, 0) || n != math.Trunc(n) {
+		return 0, apperr.BadRequest("数值必须是整数")
+	}
+	// 2^63 不能放进 int64。float64 无法精确表示 MaxInt64，用上界排除溢出。
+	if n < float64(math.MinInt64) || n >= 9223372036854775808 {
+		return 0, apperr.BadRequest("数值超出范围")
+	}
+	out := int64(n)
+	if float64(out) != n {
+		return 0, apperr.BadRequest("数值超出范围")
+	}
+	return out, nil
 }
 
 // jsonNumber avoids importing encoding/json Number in signature noise.

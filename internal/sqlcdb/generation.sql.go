@@ -9,13 +9,14 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 )
 
 const acknowledgeGenerationAttempt = `-- name: AcknowledgeGenerationAttempt :exec
 UPDATE afv_generation_attempt
 SET provider_task_id = ?,
-    submitted_at = CURRENT_TIMESTAMP(6),
-    acknowledged_at = CURRENT_TIMESTAMP(6)
+    submitted_at = UTC_TIMESTAMP(6),
+    acknowledged_at = UTC_TIMESTAMP(6)
 WHERE id = ?
 `
 
@@ -29,9 +30,9 @@ func (q *Queries) AcknowledgeGenerationAttempt(ctx context.Context, arg Acknowle
 	return err
 }
 
-const backoffOutbox = `-- name: BackoffOutbox :exec
+const backoffOutbox = `-- name: BackoffOutbox :execrows
 UPDATE afv_async_outbox
-SET next_attempt_at = TIMESTAMPADD(SECOND, LEAST(60, POW(2, LEAST(attempts + 1, 6))), CURRENT_TIMESTAMP(6)),
+SET next_attempt_at = TIMESTAMPADD(SECOND, LEAST(60, POW(2, LEAST(attempts + 1, 6))), UTC_TIMESTAMP(6)),
     attempts = attempts + 1,
     last_error = ?
 WHERE id = ? AND state = 'PENDING'
@@ -42,9 +43,12 @@ type BackoffOutboxParams struct {
 	ID        int64          `json:"id"`
 }
 
-func (q *Queries) BackoffOutbox(ctx context.Context, arg BackoffOutboxParams) error {
-	_, err := q.db.ExecContext(ctx, backoffOutbox, arg.LastError, arg.ID)
-	return err
+func (q *Queries) BackoffOutbox(ctx context.Context, arg BackoffOutboxParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, backoffOutbox, arg.LastError, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const beginJobSubmission = `-- name: BeginJobSubmission :exec
@@ -52,7 +56,7 @@ UPDATE afv_remote_generation_job
 SET provider_task_id = ?,
     phase = 'SUBMITTING',
     revision = revision + 1,
-    updated_at = CURRENT_TIMESTAMP(6)
+    updated_at = UTC_TIMESTAMP(6)
 WHERE id = ?
 `
 
@@ -71,10 +75,10 @@ UPDATE afv_remote_generation_job
 SET state = 'RUNNING',
     owner_instance_id = ?,
     owner_epoch = owner_epoch + 1,
-    lease_until = TIMESTAMPADD(SECOND, 90, CURRENT_TIMESTAMP(6)),
+    lease_until = TIMESTAMPADD(SECOND, 90, UTC_TIMESTAMP(6)),
     permit_held = ?,
     revision = revision + 1,
-    updated_at = CURRENT_TIMESTAMP(6)
+    updated_at = UTC_TIMESTAMP(6)
 WHERE id = ?
 `
 
@@ -104,9 +108,20 @@ func (q *Queries) CountPermitHeldByActor(ctx context.Context, actorUserID int64)
 	return count, err
 }
 
+const databaseNow = `-- name: DatabaseNow :one
+SELECT UTC_TIMESTAMP(6) AS now
+`
+
+func (q *Queries) DatabaseNow(ctx context.Context) (time.Time, error) {
+	row := q.db.QueryRowContext(ctx, databaseNow)
+	var now time.Time
+	err := row.Scan(&now)
+	return now, err
+}
+
 const deferJobForCapacity = `-- name: DeferJobForCapacity :exec
 UPDATE afv_remote_generation_job
-SET next_poll_at = TIMESTAMPADD(SECOND, 2, CURRENT_TIMESTAMP(6))
+SET next_poll_at = TIMESTAMPADD(SECOND, 2, UTC_TIMESTAMP(6))
 WHERE id = ?
 `
 
@@ -125,7 +140,7 @@ SET state = ?,
     error_code = ?,
     error_message = ?,
     revision = revision + 1,
-    updated_at = CURRENT_TIMESTAMP(6)
+    updated_at = UTC_TIMESTAMP(6)
 WHERE id = ?
 `
 
@@ -278,12 +293,12 @@ func (q *Queries) GetRemoteGenerationJob(ctx context.Context, id string) (AfvRem
 
 const heartbeatRemoteGenerationJob = `-- name: HeartbeatRemoteGenerationJob :execrows
 UPDATE afv_remote_generation_job
-SET lease_until = TIMESTAMPADD(SECOND, 90, CURRENT_TIMESTAMP(6))
+SET lease_until = TIMESTAMPADD(SECOND, 90, UTC_TIMESTAMP(6))
 WHERE id = ?
   AND owner_instance_id = ?
   AND owner_epoch = ?
   AND state = 'RUNNING'
-  AND lease_until > CURRENT_TIMESTAMP(6)
+  AND lease_until > UTC_TIMESTAMP(6)
 `
 
 type HeartbeatRemoteGenerationJobParams struct {
@@ -304,7 +319,7 @@ const insertAsyncOutbox = `-- name: InsertAsyncOutbox :exec
 INSERT INTO afv_async_outbox (
   event_key, event_type, aggregate_id, payload_json, next_attempt_at, created_at
 ) VALUES (
-  ?, ?, ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  ?, ?, ?, ?, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
 )
 `
 
@@ -329,7 +344,7 @@ const insertGenerationAttempt = `-- name: InsertGenerationAttempt :exec
 INSERT INTO afv_generation_attempt (
   id, job_id, attempt_no, request_json, created_at
 ) VALUES (
-  ?, ?, ?, ?, CURRENT_TIMESTAMP(6)
+  ?, ?, ?, ?, UTC_TIMESTAMP(6)
 )
 `
 
@@ -360,8 +375,8 @@ INSERT INTO afv_generation_submission (
   ?, ?, ?, ?, ?, ?, ?,
   ?, ?, ?, ?,
   ?, ?, ?, ?,
-  ?, 0, 1, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
-)
+  ?, 0, 1, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
+) ON DUPLICATE KEY UPDATE id = id
 `
 
 type InsertGenerationSubmissionParams struct {
@@ -411,8 +426,8 @@ INSERT INTO afv_remote_generation_job (
   state, phase, input_json, next_poll_at, deadline_at, created_at, updated_at
 ) VALUES (
   ?, ?, ?, ?, ?, ?, ?,
-  'QUEUED', 'NEW', ?, CURRENT_TIMESTAMP(6),
-  TIMESTAMPADD(HOUR, 2, CURRENT_TIMESTAMP(6)), CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
+  'QUEUED', 'NEW', ?, UTC_TIMESTAMP(6),
+  TIMESTAMPADD(HOUR, 2, UTC_TIMESTAMP(6)), UTC_TIMESTAMP(6), UTC_TIMESTAMP(6)
 )
 `
 
@@ -526,6 +541,50 @@ func (q *Queries) LockGenerationSubmissionByID(ctx context.Context, id string) (
 	return id, err
 }
 
+const lockGenerationSubmissionByScopeRequest = `-- name: LockGenerationSubmissionByScopeRequest :one
+SELECT
+  id, request_id, scope_key, request_hash, kind, task_id, public_task_id,
+  actor_user_id, actor_team_id, project_id, canvas_node_run_id,
+  context_json, model_snapshot_json, api_config_id, api_config_hash,
+  state, cancel_requested, revision, created_at, updated_at
+FROM afv_generation_submission
+WHERE scope_key = ? AND request_id = ?
+FOR UPDATE
+`
+
+type LockGenerationSubmissionByScopeRequestParams struct {
+	ScopeKey  string `json:"scope_key"`
+	RequestID string `json:"request_id"`
+}
+
+func (q *Queries) LockGenerationSubmissionByScopeRequest(ctx context.Context, arg LockGenerationSubmissionByScopeRequestParams) (AfvGenerationSubmission, error) {
+	row := q.db.QueryRowContext(ctx, lockGenerationSubmissionByScopeRequest, arg.ScopeKey, arg.RequestID)
+	var i AfvGenerationSubmission
+	err := row.Scan(
+		&i.ID,
+		&i.RequestID,
+		&i.ScopeKey,
+		&i.RequestHash,
+		&i.Kind,
+		&i.TaskID,
+		&i.PublicTaskID,
+		&i.ActorUserID,
+		&i.ActorTeamID,
+		&i.ProjectID,
+		&i.CanvasNodeRunID,
+		&i.ContextJson,
+		&i.ModelSnapshotJson,
+		&i.ApiConfigID,
+		&i.ApiConfigHash,
+		&i.State,
+		&i.CancelRequested,
+		&i.Revision,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const markJobsReadyBySubmission = `-- name: MarkJobsReadyBySubmission :exec
 UPDATE afv_remote_generation_job
 SET state = 'READY'
@@ -542,7 +601,7 @@ UPDATE afv_async_outbox
 SET state = 'DELIVERED',
     attempts = attempts + 1,
     last_error = NULL,
-    delivered_at = CURRENT_TIMESTAMP(6)
+    delivered_at = UTC_TIMESTAMP(6)
 WHERE id = ?
 `
 
@@ -556,7 +615,7 @@ SELECT o.id, o.event_type, o.aggregate_id, o.payload_json
 FROM afv_async_outbox o
 WHERE o.state = 'PENDING'
   AND o.event_type IN ('GENERATION_ACCEPTED', 'GENERATION_CHANGED', 'MEDIA_JOB_ACCEPTED')
-  AND o.next_attempt_at <= CURRENT_TIMESTAMP(6)
+  AND o.next_attempt_at <= UTC_TIMESTAMP(6)
   AND NOT EXISTS (
     SELECT 1 FROM afv_async_outbox prior
     WHERE prior.aggregate_id = o.aggregate_id
@@ -592,7 +651,7 @@ UPDATE afv_remote_generation_job
 SET active_attempt_id = ?,
     phase = 'PREPARING',
     revision = revision + 1,
-    updated_at = CURRENT_TIMESTAMP(6)
+    updated_at = UTC_TIMESTAMP(6)
 WHERE id = ?
 `
 
@@ -611,13 +670,13 @@ UPDATE afv_remote_generation_job
 SET state = 'WAITING',
     phase = ?,
     lease_until = NULL,
-    next_poll_at = TIMESTAMPADD(SECOND, ?, CURRENT_TIMESTAMP(6)),
+    next_poll_at = TIMESTAMPADD(SECOND, ?, UTC_TIMESTAMP(6)),
     poll_attempts = poll_attempts + 1,
     consecutive_errors = ?,
     error_code = ?,
     error_message = ?,
     revision = revision + 1,
-    updated_at = CURRENT_TIMESTAMP(6)
+    updated_at = UTC_TIMESTAMP(6)
 WHERE id = ?
 `
 
@@ -646,8 +705,8 @@ const selectClaimCandidates = `-- name: SelectClaimCandidates :many
 SELECT id, model_id, actor_user_id, project_id, phase, permit_held, cancel_requested
 FROM afv_remote_generation_job
 WHERE (
-    (state IN ('READY', 'WAITING') AND next_poll_at <= CURRENT_TIMESTAMP(6))
-    OR (state = 'RUNNING' AND lease_until <= CURRENT_TIMESTAMP(6))
+    (state IN ('READY', 'WAITING') AND next_poll_at <= UTC_TIMESTAMP(6))
+    OR (state = 'RUNNING' AND lease_until <= UTC_TIMESTAMP(6))
     OR state = 'NEEDS_REVIEW'
     OR (state = 'UNKNOWN_SUBMISSION' AND (permit_held = TRUE OR phase <> 'FINISHED'))
   )
@@ -709,7 +768,7 @@ WHERE id = ?
   AND owner_instance_id = ?
   AND owner_epoch = ?
   AND state = 'RUNNING'
-  AND lease_until > CURRENT_TIMESTAMP(6)
+  AND lease_until > UTC_TIMESTAMP(6)
 FOR UPDATE
 `
 
@@ -757,7 +816,7 @@ func (q *Queries) SelectLeasedJobForUpdate(ctx context.Context, arg SelectLeased
 
 const updateGenerationSubmissionState = `-- name: UpdateGenerationSubmissionState :execrows
 UPDATE afv_generation_submission
-SET state = ?, revision = revision + 1, updated_at = CURRENT_TIMESTAMP(6)
+SET state = ?, revision = revision + 1, updated_at = UTC_TIMESTAMP(6)
 WHERE id = ?
 `
 

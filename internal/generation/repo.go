@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/sqlcdb"
@@ -18,6 +19,11 @@ type Repository struct {
 
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
+}
+
+// Now 读取数据库 UTC 时钟，与 Java GenerationJobRepository.now 一致。
+func (r *Repository) Now(ctx context.Context) (time.Time, error) {
+	return sqlcdb.New(r.db).DatabaseNow(ctx)
 }
 
 func (r *Repository) Claim(ctx context.Context, owner string) (*Job, error) {

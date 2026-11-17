@@ -113,7 +113,11 @@ func (w *Worker) execute(ctx context.Context, initial Job) error {
 	if job.CancelRequested && (job.Phase == PhaseNew || job.Phase == PhasePreparing) {
 		return w.repo.Fail(ctx, claim, StateCancelled, "CANCELLED_BEFORE_SUBMISSION", "已取消排队，尚未提交供应商")
 	}
-	if time.Now().UTC().After(job.DeadlineAt) {
+	now, err := w.repo.Now(ctx)
+	if err != nil {
+		return err
+	}
+	if now.After(job.DeadlineAt) {
 		state := StateFailed
 		if job.Phase != PhaseNew && job.Phase != PhasePreparing {
 			state = StateUnknownSubmission

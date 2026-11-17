@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
@@ -43,27 +44,6 @@ func (s *Service) Enqueue(ctx context.Context, actorUserID int64, req EnqueueReq
 	var out EnqueueResult
 	err := withTx(ctx, s.db, func(tx *sql.Tx) error {
 		q := sqlcdb.New(tx)
-		existing, err := q.GetMediaJobByActorRequest(ctx, sqlcdb.GetMediaJobByActorRequestParams{
-			ActorUserID: actorUserID,
-			RequestID:   requestID,
-		})
-		if err == nil {
-			if existing.RequestHash != hash {
-				return apperr.Conflict("同一请求 ID 不能提交不同的媒体命令")
-			}
-			out = EnqueueResult{
-				ID:        existing.ID,
-				RequestID: existing.RequestID,
-				Kind:      existing.Kind,
-				Status:    existing.Status,
-				Replay:    true,
-			}
-			return nil
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-
 		id := newUUID()
 		inputJSON, err := json.Marshal(input)
 		if err != nil {
@@ -84,6 +64,7 @@ func (s *Service) Enqueue(ctx context.Context, actorUserID int64, req EnqueueReq
 			return err
 		}
 
+		// 先插入，唯一键冲突时保持原行。并发的同一 requestId 在锁读时汇合，不再把 1062 变成 500。
 		if err := q.InsertMediaJob(ctx, sqlcdb.InsertMediaJobParams{
 			ID:             id,
 			Kind:           kind,
@@ -99,6 +80,29 @@ func (s *Service) Enqueue(ctx context.Context, actorUserID int64, req EnqueueReq
 			Phase:          "等待处理",
 		}); err != nil {
 			return err
+		}
+		existing, err := q.LockMediaJobByActorRequest(ctx, sqlcdb.LockMediaJobByActorRequestParams{
+			ActorUserID: actorUserID,
+			RequestID:   requestID,
+		})
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("媒体任务未写入，requestId=%s", requestID)
+			}
+			return err
+		}
+		if existing.RequestHash != hash {
+			return apperr.Conflict("同一请求 ID 不能提交不同的媒体命令")
+		}
+		if existing.ID != id {
+			out = EnqueueResult{
+				ID:        existing.ID,
+				RequestID: existing.RequestID,
+				Kind:      existing.Kind,
+				Status:    existing.Status,
+				Replay:    true,
+			}
+			return nil
 		}
 		if err := q.InsertAsyncOutbox(ctx, sqlcdb.InsertAsyncOutboxParams{
 			EventKey:    "media:" + id + ":1",

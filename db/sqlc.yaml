@@ -1,3 +1,5 @@
+# 任务 SQL 使用 UTC_TIMESTAMP(6)。用 make sqlc（scripts/sqlc-generate.sh）生成。
+# sqlc 1.30 的 MySQL 目录没有带精度参数的 UTC_TIMESTAMP，直接 sqlc generate 会失败。
 version: "2"
 sql:
   - engine: "mysql"

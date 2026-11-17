@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
@@ -42,27 +43,6 @@ func (s *Service) EnqueueEcho(ctx context.Context, actorUserID int64, req EchoRe
 	var out EchoEnqueueResult
 	err := withTx(ctx, s.db, func(tx *sql.Tx) error {
 		q := sqlcdb.New(tx)
-		existing, err := q.GetGenerationSubmissionByScopeRequest(ctx, sqlcdb.GetGenerationSubmissionByScopeRequestParams{
-			ScopeKey:  scope,
-			RequestID: requestID,
-		})
-		if err == nil {
-			if existing.RequestHash != hash {
-				return apperr.Conflict("同一请求 ID 不能提交不同的生成命令")
-			}
-			out = EchoEnqueueResult{
-				ID:        existing.ID,
-				RequestID: existing.RequestID,
-				State:     existing.State,
-				Kind:      existing.Kind,
-				Replay:    true,
-			}
-			return nil
-		}
-		if !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-
 		submissionID := newUUID()
 		jobID := newUUID()
 		taskID := taskIDFrom(submissionID)
@@ -93,6 +73,7 @@ func (s *Service) EnqueueEcho(ctx context.Context, actorUserID int64, req EchoRe
 			return err
 		}
 
+		// 先插入，唯一键冲突时保持原行。并发的同一 requestId 在锁读时汇合，不再把 1062 变成 500。
 		if err := q.InsertGenerationSubmission(ctx, sqlcdb.InsertGenerationSubmissionParams{
 			ID:                submissionID,
 			RequestID:         requestID,
@@ -112,6 +93,29 @@ func (s *Service) EnqueueEcho(ctx context.Context, actorUserID int64, req EchoRe
 			State:             StateQueued,
 		}); err != nil {
 			return err
+		}
+		existing, err := q.LockGenerationSubmissionByScopeRequest(ctx, sqlcdb.LockGenerationSubmissionByScopeRequestParams{
+			ScopeKey:  scope,
+			RequestID: requestID,
+		})
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("生成受理未写入，requestId=%s", requestID)
+			}
+			return err
+		}
+		if existing.RequestHash != hash {
+			return apperr.Conflict("同一请求 ID 不能提交不同的生成命令")
+		}
+		if existing.ID != submissionID {
+			out = EchoEnqueueResult{
+				ID:        existing.ID,
+				RequestID: existing.RequestID,
+				State:     existing.State,
+				Kind:      existing.Kind,
+				Replay:    true,
+			}
+			return nil
 		}
 		if err := q.InsertRemoteGenerationJob(ctx, sqlcdb.InsertRemoteGenerationJobParams{
 			ID:           jobID,
