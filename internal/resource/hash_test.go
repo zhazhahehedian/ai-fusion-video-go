@@ -37,6 +37,31 @@ func TestHashCommandStableAndSensitive(t *testing.T) {
 	}
 }
 
+func TestDeleteParentVersionChangesHashOnlyWhenSet(t *testing.T) {
+	base := DeleteCommand{ReqID: "r", ResType: TypeScriptScene, ID: 4, Version: 1}
+	again := base
+	h1, err := HashCommand(base, 3, OriginUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h2, err := HashCommand(again, 3, OriginUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h1 != h2 {
+		t.Fatal("nil parentVersion must not change the idempotency hash")
+	}
+	parent := int32(2)
+	again.ParentVersion = &parent
+	h3, err := HashCommand(again, 3, OriginUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h1 == h3 {
+		t.Fatal("parentVersion must change the idempotency hash")
+	}
+}
+
 func TestValidateRequestID(t *testing.T) {
 	if _, err := ValidateRequestID(""); err == nil {
 		t.Fatal("empty should fail")

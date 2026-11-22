@@ -10,6 +10,78 @@ import (
 	"time"
 )
 
+// 资产表
+type AfvAsset struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 创建者用户ID
+	UserID sql.NullInt64 `json:"user_id"`
+	// 所属项目ID
+	ProjectID sql.NullInt64 `json:"project_id"`
+	// 资产类型：character/scene/prop/vehicle/building/costume/effect
+	Type sql.NullString `json:"type"`
+	// 资产名称
+	Name string `json:"name"`
+	// 资产描述
+	Description sql.NullString `json:"description"`
+	// 封面图URL
+	CoverUrl sql.NullString `json:"cover_url"`
+	// 动态属性JSON（如角色的appearance、age等）
+	Properties json.RawMessage `json:"properties"`
+	// 标签列表JSON
+	Tags json.RawMessage `json:"tags"`
+	// 来源类型：1-用户上传 2-AI生成
+	SourceType sql.NullInt32 `json:"source_type"`
+	// AI生成时使用的提示词
+	AiPrompt sql.NullString `json:"ai_prompt"`
+	// 拥有者类型：1-个人 2-团队
+	OwnerType sql.NullInt32 `json:"owner_type"`
+	// 拥有者ID
+	OwnerID sql.NullInt64 `json:"owner_id"`
+	// 状态：0-草稿 1-正常
+	Status sql.NullInt32 `json:"status"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间
+	UpdateTime time.Time `json:"update_time"`
+	// 业务内容版本
+	Version int32 `json:"version"`
+}
+
+// 子资产表
+type AfvAssetItem struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属主资产ID
+	AssetID int64 `json:"asset_id"`
+	// 子资产类型：front/side/back/detail/expression/pose/variant/original
+	ItemType sql.NullString `json:"item_type"`
+	// 子资产名称
+	Name sql.NullString `json:"name"`
+	// 图片URL
+	ImageUrl sql.NullString `json:"image_url"`
+	// 缩略图URL
+	ThumbnailUrl sql.NullString `json:"thumbnail_url"`
+	// 动态属性JSON
+	Properties json.RawMessage `json:"properties"`
+	// 排列顺序
+	SortOrder sql.NullInt32 `json:"sort_order"`
+	// 来源类型：1-用户上传 2-AI生成
+	SourceType sql.NullInt32 `json:"source_type"`
+	// AI生成时使用的提示词
+	AiPrompt sql.NullString `json:"ai_prompt"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间
+	UpdateTime time.Time `json:"update_time"`
+	// 业务内容版本
+	Version int32 `json:"version"`
+}
+
 // 业务任务可靠投递发件箱
 type AfvAsyncOutbox struct {
 	// 投递记录标识
@@ -116,6 +188,88 @@ type AfvGenerationSubmission struct {
 	CreatedAt time.Time `json:"created_at"`
 	// 最近状态变化时间（UTC）
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// 生图条目表
+type AfvImageItem struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属生图任务ID
+	TaskID int64 `json:"task_id"`
+	// 平台侧任务ID
+	PlatformTaskID sql.NullString `json:"platform_task_id"`
+	// 生成的图片URL
+	ImageUrl sql.NullString `json:"image_url"`
+	// 缩略图URL
+	ThumbnailUrl sql.NullString `json:"thumbnail_url"`
+	// 图片宽度（像素）
+	Width sql.NullInt32 `json:"width"`
+	// 图片高度（像素）
+	Height sql.NullInt32 `json:"height"`
+	// 文件大小（字节）
+	FileSize sql.NullInt64 `json:"file_size"`
+	// 状态：0-生成中 1-成功 2-失败
+	Status sql.NullInt32 `json:"status"`
+	// 失败错误信息
+	ErrorMsg sql.NullString `json:"error_msg"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间（UTC）
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间（UTC）
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// 生图任务表
+type AfvImageTask struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 任务唯一标识
+	TaskID string `json:"task_id"`
+	// 发起用户ID
+	UserID int64 `json:"user_id"`
+	// 关联项目ID
+	ProjectID sql.NullInt64 `json:"project_id"`
+	// 生图提示词
+	Prompt sql.NullString `json:"prompt"`
+	// 提示词模板ID
+	PromptTemplateID sql.NullInt64 `json:"prompt_template_id"`
+	// 参考图片URL列表JSON
+	RefImageUrls json.RawMessage `json:"ref_image_urls"`
+	// 画面比例（如16:9）
+	Ratio sql.NullString `json:"ratio"`
+	// 分辨率（如1920x1080）
+	Resolution sql.NullString `json:"resolution"`
+	// 宽高比描述
+	AspectRatio sql.NullString `json:"aspect_ratio"`
+	// 图片宽度（像素）
+	Width sql.NullInt32 `json:"width"`
+	// 图片高度（像素）
+	Height sql.NullInt32 `json:"height"`
+	// 生成数量
+	Count sql.NullInt32 `json:"count"`
+	// 已成功生成数量
+	SuccessCount sql.NullInt32 `json:"success_count"`
+	// 任务状态：0-排队中 1-处理中 2-已完成 3-失败
+	Status sql.NullInt32 `json:"status"`
+	// 失败错误信息
+	ErrorMsg sql.NullString `json:"error_msg"`
+	// 使用的AI模型ID
+	ModelID sql.NullInt64 `json:"model_id"`
+	// 固定的 ComfyUI 工作流版本标识
+	WorkflowVersionID sql.NullInt64 `json:"workflow_version_id"`
+	// 任务分类标签
+	Category sql.NullString `json:"category"`
+	// 拥有者类型：1-个人 2-团队
+	OwnerType sql.NullInt32 `json:"owner_type"`
+	// 拥有者ID
+	OwnerID sql.NullInt64 `json:"owner_id"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间（UTC）
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间（UTC）
+	UpdateTime time.Time `json:"update_time"`
 }
 
 // 可恢复媒体处理任务
@@ -447,6 +601,304 @@ type AfvScriptSceneItem struct {
 	// 创建时间
 	CreateTime time.Time `json:"create_time"`
 	// 更新时间
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// 分镜脚本表
+type AfvStoryboard struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属项目ID
+	ProjectID sql.NullInt64 `json:"project_id"`
+	// 关联剧本ID
+	ScriptID sql.NullInt64 `json:"script_id"`
+	// 分镜标题
+	Title sql.NullString `json:"title"`
+	// 分镜描述
+	Description sql.NullString `json:"description"`
+	// 自定义列配置JSON
+	CustomColumns json.RawMessage `json:"custom_columns"`
+	// 可见范围：1-公开 2-私有 3-仅团队可见
+	Scope sql.NullInt32 `json:"scope"`
+	// 拥有者类型：1-个人 2-团队
+	OwnerType sql.NullInt32 `json:"owner_type"`
+	// 拥有者ID
+	OwnerID sql.NullInt64 `json:"owner_id"`
+	// 预估总时长（秒）
+	TotalDuration sql.NullInt32 `json:"total_duration"`
+	// 状态：0-草稿 1-正常
+	Status sql.NullInt32 `json:"status"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间
+	UpdateTime time.Time `json:"update_time"`
+	// 业务内容版本
+	Version int32 `json:"version"`
+}
+
+// 分镜集表
+type AfvStoryboardEpisode struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属分镜ID
+	StoryboardID int64 `json:"storyboard_id"`
+	// 关联的剧本分集ID
+	ScriptEpisodeID sql.NullInt64 `json:"script_episode_id"`
+	// 集号
+	EpisodeNumber sql.NullInt32 `json:"episode_number"`
+	// 集标题
+	Title sql.NullString `json:"title"`
+	// 本集梗概
+	Synopsis sql.NullString `json:"synopsis"`
+	// 排列顺序
+	SortOrder sql.NullInt32 `json:"sort_order"`
+	// 状态：0-草稿 1-正常
+	Status sql.NullInt32 `json:"status"`
+	// 逻辑删除标志
+	Deleted sql.NullInt16 `json:"deleted"`
+	// 逻辑删除隔离标识，0-未删除，删除后为记录ID
+	DeletedID int64 `json:"deleted_id"`
+	// 创建时间
+	CreateTime sql.NullTime `json:"create_time"`
+	// 更新时间
+	UpdateTime sql.NullTime `json:"update_time"`
+	// 本集合成视频URL
+	ComposedVideoUrl sql.NullString `json:"composed_video_url"`
+	// 合成状态: 0未开始 1合成中 2已完成 3失败
+	ComposeStatus int8 `json:"compose_status"`
+	// 合成失败原因
+	ComposeErrorMsg sql.NullString `json:"compose_error_msg"`
+	// 合成完成时间
+	ComposedAt sql.NullTime `json:"composed_at"`
+	// Sonilo 配乐任务ID（如需查询该音轨的授权记录，凭此ID向 Sonilo 查询）
+	BgmTaskID sql.NullString `json:"bgm_task_id"`
+	// 配乐音轨URL（持久化存档）
+	BgmAudioUrl sql.NullString `json:"bgm_audio_url"`
+	// 音效音轨URL（持久化存档）
+	BgmSfxAudioUrl sql.NullString `json:"bgm_sfx_audio_url"`
+	// 配乐失败原因（配乐失败不影响本集合成结果）
+	BgmErrorMsg sql.NullString `json:"bgm_error_msg"`
+	// 业务内容版本
+	Version int32 `json:"version"`
+	// 最近一次媒体合成任务标识
+	ComposeJobID sql.NullString `json:"compose_job_id"`
+}
+
+// 分镜条目表
+type AfvStoryboardItem struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属分镜ID
+	StoryboardID int64 `json:"storyboard_id"`
+	// 所属分镜集ID
+	StoryboardEpisodeID sql.NullInt64 `json:"storyboard_episode_id"`
+	// 所属分镜场次ID
+	StoryboardSceneID sql.NullInt64 `json:"storyboard_scene_id"`
+	// 排列顺序
+	SortOrder sql.NullInt32 `json:"sort_order"`
+	// 镜号
+	ShotNumber sql.NullString `json:"shot_number"`
+	// 自动编号（系统生成）
+	AutoShotNumber sql.NullString `json:"auto_shot_number"`
+	// 用户上传参考图片URL
+	ImageUrl sql.NullString `json:"image_url"`
+	// 外部参考图片URL
+	ReferenceImageUrl sql.NullString `json:"reference_image_url"`
+	// 视频URL（最终成品）
+	VideoUrl sql.NullString `json:"video_url"`
+	// AI生成的图片URL
+	GeneratedImageUrl sql.NullString `json:"generated_image_url"`
+	// 首帧参考图片URL
+	FirstFrameImageUrl sql.NullString `json:"first_frame_image_url"`
+	// 尾帧参考图片URL
+	LastFrameImageUrl sql.NullString `json:"last_frame_image_url"`
+	// AI生成首帧时使用的提示词
+	FirstFramePrompt sql.NullString `json:"first_frame_prompt"`
+	// AI生成尾帧时使用的提示词
+	LastFramePrompt sql.NullString `json:"last_frame_prompt"`
+	// AI生成的视频URL
+	GeneratedVideoUrl sql.NullString `json:"generated_video_url"`
+	// 景别：远景/全景/中景/近景/特写
+	ShotType sql.NullString `json:"shot_type"`
+	// 预估时长（秒）
+	Duration sql.NullString `json:"duration"`
+	// 画面内容描述
+	Content sql.NullString `json:"content"`
+	// 画面期望描述（AI生图提示）
+	SceneExpectation sql.NullString `json:"scene_expectation"`
+	// 声音描述
+	Sound sql.NullString `json:"sound"`
+	// 台词/旁白
+	Dialogue sql.NullString `json:"dialogue"`
+	// 音效
+	SoundEffect sql.NullString `json:"sound_effect"`
+	// 配乐建议
+	Music sql.NullString `json:"music"`
+	// 镜头运动：推/拉/摇/移/跟/升/降
+	CameraMovement sql.NullString `json:"camera_movement"`
+	// 镜头角度：平视/俯视/仰视
+	CameraAngle sql.NullString `json:"camera_angle"`
+	// 摄像机装备
+	CameraEquipment sql.NullString `json:"camera_equipment"`
+	// 镜头焦段
+	FocalLength sql.NullString `json:"focal_length"`
+	// 转场效果：切/淡入/淡出/溶/划
+	Transition sql.NullString `json:"transition"`
+	// 出场角色子资产ID列表 JSON (List<Long> of AssetItem.id)
+	CharacterIds json.RawMessage `json:"character_ids"`
+	// 场景子资产ID (AssetItem.id)
+	SceneAssetItemID sql.NullInt64 `json:"scene_asset_item_id"`
+	// 道具子资产ID列表 JSON (List<Long> of AssetItem.id)
+	PropIds sql.NullString `json:"prop_ids"`
+	// 备注
+	Remark sql.NullString `json:"remark"`
+	// 自定义扩展数据JSON
+	CustomData json.RawMessage `json:"custom_data"`
+	// 是否由AI生成
+	AiGenerated sql.NullInt16 `json:"ai_generated"`
+	// 状态：0-草稿 1-正常
+	Status sql.NullInt32 `json:"status"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间
+	UpdateTime time.Time `json:"update_time"`
+	// AI生成视频时使用的提示词（保存以便复用和手动调整）
+	VideoPrompt sql.NullString `json:"video_prompt"`
+	// 业务内容版本
+	Version int32 `json:"version"`
+}
+
+// 分镜场次表
+type AfvStoryboardScene struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属分镜集ID
+	EpisodeID int64 `json:"episode_id"`
+	// 所属分镜ID（冗余）
+	StoryboardID int64 `json:"storyboard_id"`
+	// 场次编号
+	SceneNumber sql.NullString `json:"scene_number"`
+	// 场景标头
+	SceneHeading sql.NullString `json:"scene_heading"`
+	// 场景地点
+	Location sql.NullString `json:"location"`
+	// 时间段
+	TimeOfDay sql.NullString `json:"time_of_day"`
+	// 内外景标识
+	IntExt sql.NullString `json:"int_ext"`
+	// 排列顺序
+	SortOrder sql.NullInt32 `json:"sort_order"`
+	// 状态：0-草稿 1-正常
+	Status sql.NullInt32 `json:"status"`
+	// 逻辑删除标志
+	Deleted sql.NullInt16 `json:"deleted"`
+	// 创建时间
+	CreateTime sql.NullTime `json:"create_time"`
+	// 更新时间
+	UpdateTime sql.NullTime `json:"update_time"`
+	// 业务内容版本
+	Version int32 `json:"version"`
+}
+
+// 生视频条目表
+type AfvVideoItem struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 所属生视频任务ID
+	TaskID int64 `json:"task_id"`
+	// 平台侧任务ID
+	PlatformTaskID sql.NullString `json:"platform_task_id"`
+	// 生成的视频URL
+	VideoUrl sql.NullString `json:"video_url"`
+	// 视频封面图URL
+	CoverUrl sql.NullString `json:"cover_url"`
+	// 视频时长（秒）
+	Duration sql.NullInt32 `json:"duration"`
+	// 文件大小（字节）
+	FileSize sql.NullInt64 `json:"file_size"`
+	// 状态：0-生成中 1-成功 2-失败
+	Status sql.NullInt32 `json:"status"`
+	// 失败错误信息
+	ErrorMsg sql.NullString `json:"error_msg"`
+	// 视频首帧图片URL
+	FirstFrameUrl sql.NullString `json:"first_frame_url"`
+	// 视频尾帧图片URL
+	LastFrameUrl sql.NullString `json:"last_frame_url"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间（UTC）
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间（UTC）
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// 生视频任务表
+type AfvVideoTask struct {
+	// 主键ID
+	ID int64 `json:"id"`
+	// 任务唯一标识
+	TaskID string `json:"task_id"`
+	// 发起用户ID
+	UserID int64 `json:"user_id"`
+	// 关联项目ID
+	ProjectID sql.NullInt64 `json:"project_id"`
+	// 生视频提示词
+	Prompt sql.NullString `json:"prompt"`
+	// 提示词模板ID
+	PromptTemplateID sql.NullInt64 `json:"prompt_template_id"`
+	// 生成模式：text2video/image2video
+	GenerateMode sql.NullString `json:"generate_mode"`
+	// 首帧参考图片URL
+	FirstFrameImageUrl sql.NullString `json:"first_frame_image_url"`
+	// 尾帧参考图片URL
+	LastFrameImageUrl sql.NullString `json:"last_frame_image_url"`
+	// 参考图片URL列表JSON
+	ReferenceImageUrls json.RawMessage `json:"reference_image_urls"`
+	// 参考视频URL列表 JSON
+	ReferenceVideoUrls json.RawMessage `json:"reference_video_urls"`
+	// 参考音频URL列表 JSON
+	ReferenceAudioUrls json.RawMessage `json:"reference_audio_urls"`
+	// 画面比例（如16:9）
+	Ratio sql.NullString `json:"ratio"`
+	// 分辨率（如1920x1080）
+	Resolution sql.NullString `json:"resolution"`
+	// 视频时长（秒）
+	Duration sql.NullInt32 `json:"duration"`
+	// 是否添加水印
+	Watermark sql.NullInt16 `json:"watermark"`
+	// 是否生成配音
+	GenerateAudio sql.NullInt16 `json:"generate_audio"`
+	// 随机种子（用于复现）
+	Seed sql.NullInt64 `json:"seed"`
+	// 是否固定镜头
+	CameraFixed sql.NullInt16 `json:"camera_fixed"`
+	// 生成数量
+	Count sql.NullInt32 `json:"count"`
+	// 已成功生成数量
+	SuccessCount sql.NullInt32 `json:"success_count"`
+	// 任务状态：0-排队中 1-处理中 2-已完成 3-失败
+	Status sql.NullInt32 `json:"status"`
+	// 失败错误信息
+	ErrorMsg sql.NullString `json:"error_msg"`
+	// 使用的AI模型ID
+	ModelID sql.NullInt64 `json:"model_id"`
+	// 固定的 ComfyUI 工作流版本标识
+	WorkflowVersionID sql.NullInt64 `json:"workflow_version_id"`
+	// 任务分类标签
+	Category sql.NullString `json:"category"`
+	// 拥有者类型：1-个人 2-团队
+	OwnerType sql.NullInt32 `json:"owner_type"`
+	// 拥有者ID
+	OwnerID sql.NullInt64 `json:"owner_id"`
+	// 逻辑删除标志
+	Deleted int8 `json:"deleted"`
+	// 创建时间（UTC）
+	CreateTime time.Time `json:"create_time"`
+	// 更新时间（UTC）
 	UpdateTime time.Time `json:"update_time"`
 }
 

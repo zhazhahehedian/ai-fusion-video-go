@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 )
 
 const admitResourceCommand = `-- name: AdmitResourceCommand :exec
@@ -103,6 +104,57 @@ func (q *Queries) InsertResourceRevision(ctx context.Context, arg InsertResource
 	return err
 }
 
+const listResourceVersions = `-- name: ListResourceVersions :many
+SELECT resource_id, CAST(MAX(resource_version) AS SIGNED) AS version
+FROM afv_resource_revision
+WHERE resource_type = ? AND resource_id IN (/*SLICE:ids*/?)
+GROUP BY resource_id
+`
+
+type ListResourceVersionsParams struct {
+	ResourceType string  `json:"resource_type"`
+	Ids          []int64 `json:"ids"`
+}
+
+type ListResourceVersionsRow struct {
+	ResourceID int64 `json:"resource_id"`
+	Version    int64 `json:"version"`
+}
+
+func (q *Queries) ListResourceVersions(ctx context.Context, arg ListResourceVersionsParams) ([]ListResourceVersionsRow, error) {
+	query := listResourceVersions
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.ResourceType)
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListResourceVersionsRow{}
+	for rows.Next() {
+		var i ListResourceVersionsRow
+		if err := rows.Scan(&i.ResourceID, &i.Version); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockResourceCommandByRequest = `-- name: LockResourceCommandByRequest :one
 SELECT id, request_hash, COALESCE(CAST(result_json AS CHAR), '') AS result_json
 FROM afv_resource_command
@@ -126,4 +178,22 @@ func (q *Queries) LockResourceCommandByRequest(ctx context.Context, arg LockReso
 	var i LockResourceCommandByRequestRow
 	err := row.Scan(&i.ID, &i.RequestHash, &i.ResultJson)
 	return i, err
+}
+
+const maxResourceVersion = `-- name: MaxResourceVersion :one
+SELECT CAST(COALESCE(MAX(resource_version), 0) AS SIGNED) AS version
+FROM afv_resource_revision
+WHERE resource_type = ? AND resource_id = ?
+`
+
+type MaxResourceVersionParams struct {
+	ResourceType string `json:"resource_type"`
+	ResourceID   int64  `json:"resource_id"`
+}
+
+func (q *Queries) MaxResourceVersion(ctx context.Context, arg MaxResourceVersionParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, maxResourceVersion, arg.ResourceType, arg.ResourceID)
+	var version int64
+	err := row.Scan(&version)
+	return version, err
 }

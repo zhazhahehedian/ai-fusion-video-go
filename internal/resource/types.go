@@ -12,10 +12,18 @@ import (
 type Type string
 
 const (
-	TypeProject       Type = "project"
-	TypeScript        Type = "script"
-	TypeScriptEpisode Type = "script_episode"
-	TypeScriptScene   Type = "script_scene"
+	TypeProject           Type = "project"
+	TypeScript            Type = "script"
+	TypeScriptEpisode     Type = "script_episode"
+	TypeScriptScene       Type = "script_scene"
+	TypeStoryboard        Type = "storyboard"
+	TypeStoryboardEpisode Type = "storyboardEpisode"
+	TypeStoryboardScene   Type = "storyboardScene"
+	TypeShot              Type = "shot"
+	TypeAsset             Type = "asset"
+	TypeAssetItem         Type = "assetItem"
+	TypeImageTask         Type = "imageTask"
+	TypeVideoTask         Type = "videoTask"
 )
 
 type Operation string
@@ -63,6 +71,8 @@ type PatchCommand struct {
 	ID      int64
 	Version int32
 	Patch   map[string]any
+	// ParentVersion 只在子资产更新时写入。空指针不进入哈希，避免改变已有命令的幂等摘要。
+	ParentVersion *int32 `json:"parentVersion,omitempty"`
 }
 
 func (c PatchCommand) RequestID() string    { return c.ReqID }
@@ -74,6 +84,8 @@ type DeleteCommand struct {
 	ResType Type
 	ID      int64
 	Version int32
+	// ParentVersion 只在删除子资产时写入。空指针不进入哈希。
+	ParentVersion *int32 `json:"parentVersion,omitempty"`
 }
 
 func (c DeleteCommand) RequestID() string    { return c.ReqID }

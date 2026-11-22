@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"math"
+	"sort"
 	"strconv"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
@@ -353,8 +354,33 @@ func (ScriptEpisodeDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd res
 		return resource.Mutation{}, apperr.Conflict("分集版本已变化，请刷新后重试")
 	}
 	before := resource.EpisodeVO(ep)
-	if err := q.SoftDeleteScenesByEpisode(ctx, ep.ID); err != nil {
+	scenes, err := q.ListScenesByEpisode(ctx, ep.ID)
+	if err != nil {
 		return resource.Mutation{}, err
+	}
+	sortScenesByID(scenes)
+	changes := make([]resource.Change, 0, len(scenes)+1)
+	for _, scene := range scenes {
+		locked, err := q.LockScriptSceneByID(ctx, scene.ID)
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		n, err := q.SoftDeleteScriptScene(ctx, sqlcdb.SoftDeleteScriptSceneParams{
+			ID:      locked.ID,
+			Version: locked.Version,
+		})
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		if n != 1 {
+			return resource.Mutation{}, apperr.Conflict("场次版本已变化，请刷新后重试")
+		}
+		sceneBefore := resource.SceneVO(locked)
+		change, err := deleteChange(resource.TypeScriptScene, locked.ID, 0, nullInt32Value(locked.Version)+1, sceneBefore, markDeleted(sceneBefore, nullInt32Value(locked.Version)+1), []string{"deleted"})
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		changes = append(changes, change)
 	}
 	updated, err := q.SoftDeleteScriptEpisode(ctx, sqlcdb.SoftDeleteScriptEpisodeParams{
 		ID:      ep.ID,
@@ -390,26 +416,20 @@ func (ScriptEpisodeDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd res
 	after := cloneMap(before)
 	after["deleted"] = true
 	after["version"] = nullInt32Value(ep.Version) + 1
-	eventID, err := resource.NewEventID()
+	projectID := script.ProjectID
+	episodeChange, err := deleteChange(resource.TypeScriptEpisode, ep.ID, projectID, nullInt32Value(ep.Version)+1, before, after, []string{"deleted"})
 	if err != nil {
 		return resource.Mutation{}, err
 	}
-	projectID := script.ProjectID
-	return resource.Mutation{
-		Result: true,
-		Changes: []resource.Change{{
-			EventID:       eventID,
-			ResourceType:  resource.TypeScriptEpisode,
-			ResourceID:    ep.ID,
-			ProjectID:     &projectID,
-			Version:       nullInt32Value(ep.Version) + 1,
-			Deleted:       true,
-			ChangedFields: []string{"deleted"},
-			Before:        before,
-			After:         after,
-		}},
-		PreviousValues: before,
-	}, nil
+	for i := range changes {
+		changes[i].ProjectID = projectPtr(projectID)
+	}
+	changes = append(changes, episodeChange)
+	return resource.Mutation{Result: true, Changes: changes, PreviousValues: before}, nil
+}
+
+func sortScenesByID(scenes []sqlcdb.AfvScriptSceneItem) {
+	sort.Slice(scenes, func(i, j int) bool { return scenes[i].ID < scenes[j].ID })
 }
 
 func authorizeScriptOwner(ctx context.Context, q *sqlcdb.Queries, scriptID, actorUserID int64) (*int64, error) {

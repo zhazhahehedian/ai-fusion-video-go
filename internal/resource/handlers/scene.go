@@ -230,6 +230,20 @@ func (ScriptScenePatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resour
 	if len(patch.Patch) == 0 {
 		return resource.Mutation{}, apperr.BadRequest("修改字段不能为空")
 	}
+	preview, err := q.GetScriptSceneByID(ctx, patch.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return resource.Mutation{}, apperr.NotFound("场次不存在")
+		}
+		return resource.Mutation{}, err
+	}
+	ep, err := q.LockScriptEpisodeByID(ctx, preview.EpisodeID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return resource.Mutation{}, apperr.NotFound("分集不存在")
+		}
+		return resource.Mutation{}, err
+	}
 	scene, err := q.LockScriptSceneByID(ctx, patch.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -326,10 +340,6 @@ func (ScriptScenePatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resour
 		return resource.Mutation{}, apperr.Conflict("场次版本已变化，请刷新后重试")
 	}
 
-	ep, err := q.LockScriptEpisodeByID(ctx, scene.EpisodeID)
-	if err != nil {
-		return resource.Mutation{}, err
-	}
 	if _, err := q.BumpEpisodeSceneCount(ctx, sqlcdb.BumpEpisodeSceneCountParams{
 		TotalScenes: ep.TotalScenes,
 		ID:          ep.ID,
@@ -400,6 +410,20 @@ func (ScriptSceneDelete) Authorize(ctx context.Context, q *sqlcdb.Queries, cmd r
 
 func (ScriptSceneDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.Command, actorUserID int64) (resource.Mutation, error) {
 	del := cmd.(resource.DeleteCommand)
+	preview, err := q.GetScriptSceneByID(ctx, del.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return resource.Mutation{}, apperr.NotFound("场次不存在")
+		}
+		return resource.Mutation{}, err
+	}
+	ep, err := q.LockScriptEpisodeByID(ctx, preview.EpisodeID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return resource.Mutation{}, apperr.NotFound("分集不存在")
+		}
+		return resource.Mutation{}, err
+	}
 	scene, err := q.LockScriptSceneByID(ctx, del.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -422,10 +446,6 @@ func (ScriptSceneDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resou
 		return resource.Mutation{}, apperr.Conflict("场次版本已变化，请刷新后重试")
 	}
 
-	ep, err := q.LockScriptEpisodeByID(ctx, scene.EpisodeID)
-	if err != nil {
-		return resource.Mutation{}, err
-	}
 	count, err := q.CountScenesByEpisode(ctx, scene.EpisodeID)
 	if err != nil {
 		return resource.Mutation{}, err

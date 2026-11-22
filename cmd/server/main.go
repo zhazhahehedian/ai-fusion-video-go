@@ -66,6 +66,27 @@ func run(logOut io.Writer) int {
 		handlers.ScriptSceneCreate{},
 		handlers.ScriptScenePatch{},
 		handlers.ScriptSceneDelete{},
+		handlers.StoryboardCreate{},
+		handlers.StoryboardPatch{},
+		handlers.StoryboardEpisodeCreate{},
+		handlers.StoryboardEpisodePatch{},
+		handlers.StoryboardEpisodeDelete{},
+		handlers.StoryboardSceneCreate{},
+		handlers.StoryboardScenePatch{},
+		handlers.StoryboardSceneDelete{},
+		handlers.StoryboardItemCreate{},
+		handlers.StoryboardItemPatch{},
+		handlers.StoryboardItemDelete{},
+		handlers.AssetCreate{},
+		handlers.AssetPatch{},
+		handlers.AssetDelete{},
+		handlers.AssetItemCreate{},
+		handlers.AssetItemPatch{},
+		handlers.AssetItemDelete{},
+		handlers.ImageTaskCreate{},
+		handlers.ImageTaskPatch{},
+		handlers.VideoTaskCreate{},
+		handlers.VideoTaskPatch{},
 	)
 	if err != nil {
 		logger.Error("注册资源命令处理器失败", "err", err)
@@ -73,6 +94,7 @@ func run(logOut io.Writer) int {
 	}
 	commandSvc := resource.NewService(db, registry)
 	scriptQuery := resource.NewScriptQuery(db)
+	contentQuery := resource.NewContentQuery(db)
 	generationSvc := generation.NewService(db)
 	jobRepo := generation.NewRepository(db)
 	outbox := generation.NewOutbox(db, logger)
@@ -89,6 +111,7 @@ func run(logOut io.Writer) int {
 		Projects:   projectSvc,
 		Commands:   commandSvc,
 		Scripts:    scriptQuery,
+		Content:    contentQuery,
 		Generation: generationSvc,
 		Media:      mediaSvc,
 	})
