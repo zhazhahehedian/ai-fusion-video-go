@@ -3,6 +3,7 @@ package resource
 import (
 	"database/sql"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/sqlcdb"
@@ -146,4 +147,36 @@ func rawJSON(v json.RawMessage) any {
 
 func formatTime(t time.Time) string {
 	return t.Format("2006-01-02T15:04:05")
+}
+
+func formatNullTime(t sql.NullTime) any {
+	if !t.Valid {
+		return nil
+	}
+	return formatTime(t.Time)
+}
+
+func nullTiny(v sql.NullInt16) any {
+	if !v.Valid {
+		return nil
+	}
+	return int16(v.Int16)
+}
+
+func deletedTiny(v sql.NullInt16) bool {
+	return v.Valid && v.Int16 != 0
+}
+
+func nullDecimal(v sql.NullString) any {
+	if !v.Valid {
+		return nil
+	}
+	return json.Number(v.String)
+}
+
+func rawTextJSON(v sql.NullString) any {
+	if !v.Valid || strings.TrimSpace(v.String) == "" {
+		return nil
+	}
+	return rawJSON(json.RawMessage(v.String))
 }

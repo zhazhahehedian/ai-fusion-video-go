@@ -19,10 +19,12 @@ type createChildReq struct {
 }
 
 type patchResourceReq struct {
-	ID        int64          `json:"id"`
-	Version   int32          `json:"version"`
-	RequestID string         `json:"requestId"`
-	Patch     map[string]any `json:"patch"`
+	ID            int64          `json:"id"`
+	Version       int32          `json:"version"`
+	RequestID     string         `json:"requestId"`
+	Patch         map[string]any `json:"patch"`
+	ParentVersion *int32         `json:"parentVersion"`
+	AssetVersion  *int32         `json:"assetVersion"`
 }
 
 type replaceSourceReq struct {
@@ -242,7 +244,7 @@ func (d Deps) handleChildCreate(w http.ResponseWriter, r *http.Request, resType 
 	if fields == nil {
 		fields = map[string]any{}
 	}
-	for _, key := range []string{"scriptId", "episodeId", "parentVersion"} {
+	for _, key := range []string{"scriptId", "episodeId", "storyboardId", "storyboardSceneId", "assetId", "parentVersion"} {
 		if _, exists := fields[key]; exists {
 			WriteError(w, r, apperr.BadRequest("父对象字段必须在请求顶层指定"))
 			return
@@ -273,12 +275,21 @@ func (d Deps) handleResourcePatch(w http.ResponseWriter, r *http.Request, resTyp
 		WriteError(w, r, apperr.BadRequest("请求体无效"))
 		return
 	}
+	if req.ParentVersion != nil && req.AssetVersion != nil && *req.ParentVersion != *req.AssetVersion {
+		WriteError(w, r, apperr.BadRequest("父对象版本不一致"))
+		return
+	}
+	parentVersion := req.ParentVersion
+	if parentVersion == nil {
+		parentVersion = req.AssetVersion
+	}
 	receipt, err := d.Commands.Execute(r.Context(), resource.PatchCommand{
-		ReqID:   req.RequestID,
-		ResType: resType,
-		ID:      req.ID,
-		Version: req.Version,
-		Patch:   req.Patch,
+		ReqID:         req.RequestID,
+		ResType:       resType,
+		ID:            req.ID,
+		Version:       req.Version,
+		Patch:         req.Patch,
+		ParentVersion: parentVersion,
 	}, resource.Context{ActorUserID: session.UserID})
 	if err != nil {
 		WriteError(w, r, err)
@@ -304,11 +315,22 @@ func (d Deps) handleResourceDelete(w http.ResponseWriter, r *http.Request, resTy
 		return
 	}
 	requestID := r.URL.Query().Get("requestId")
+	var parentVersion *int32
+	if raw := r.URL.Query().Get("parentVersion"); raw != "" {
+		n, convErr := strconv.Atoi(raw)
+		if convErr != nil || n < 0 {
+			WriteError(w, r, apperr.BadRequest("parentVersion 无效"))
+			return
+		}
+		v := int32(n)
+		parentVersion = &v
+	}
 	_, err = d.Commands.Execute(r.Context(), resource.DeleteCommand{
-		ReqID:   requestID,
-		ResType: resType,
-		ID:      id,
-		Version: int32(version),
+		ReqID:         requestID,
+		ResType:       resType,
+		ID:            id,
+		Version:       int32(version),
+		ParentVersion: parentVersion,
 	}, resource.Context{ActorUserID: session.UserID})
 	if err != nil {
 		WriteError(w, r, err)

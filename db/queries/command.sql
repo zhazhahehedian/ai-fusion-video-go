@@ -26,3 +26,14 @@ INSERT INTO afv_resource_revision (
   ?, ?, ?, ?,
   ?, ?, ?, ?
 );
+
+-- name: MaxResourceVersion :one
+SELECT CAST(COALESCE(MAX(resource_version), 0) AS SIGNED) AS version
+FROM afv_resource_revision
+WHERE resource_type = ? AND resource_id = ?;
+
+-- name: ListResourceVersions :many
+SELECT resource_id, CAST(MAX(resource_version) AS SIGNED) AS version
+FROM afv_resource_revision
+WHERE resource_type = ? AND resource_id IN (sqlc.slice('ids'))
+GROUP BY resource_id;

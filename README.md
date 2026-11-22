@@ -40,4 +40,4 @@ curl -s http://127.0.0.1:18080/healthz
 
 `/healthz` 会探活 MySQL 与 Redis。
 
-当前进度：阶段3资源命令管道已完成；阶段4异步生成任务（MySQL 租约队列 + worker）进行中，见 `dev-docs/2-in-progress/`。
+当前进度：阶段4异步生成任务进行中；阶段5已补充分镜、资产、图片/视频任务的数据层。讲解见 `dev-docs/2-in-progress/20261122-phase5-storyboard-asset-tasks/guide/`。

@@ -6,8 +6,8 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-queries=(db/queries/generation.sql db/queries/media.sql)
-generated=(internal/sqlcdb/generation.sql.go internal/sqlcdb/media.sql.go)
+queries=(db/queries/generation.sql db/queries/media.sql db/queries/task.sql)
+generated=(internal/sqlcdb/generation.sql.go internal/sqlcdb/media.sql.go internal/sqlcdb/task.sql.go)
 
 restore() {
   local f
@@ -24,7 +24,10 @@ for f in "${queries[@]}"; do
   python3 - "$f" << 'PY'
 import pathlib, sys
 path = pathlib.Path(sys.argv[1])
-path.write_text(path.read_text().replace("UTC_TIMESTAMP(6)", "CURRENT_TIMESTAMP(6)"))
+text = path.read_text()
+text = text.replace("UTC_TIMESTAMP(6)", "CURRENT_TIMESTAMP(6)")
+text = text.replace("UTC_TIMESTAMP()", "CURRENT_TIMESTAMP()")
+path.write_text(text)
 PY
 done
 
@@ -34,6 +37,9 @@ for f in "${generated[@]}"; do
   python3 - "$f" << 'PY'
 import pathlib, sys
 path = pathlib.Path(sys.argv[1])
-path.write_text(path.read_text().replace("CURRENT_TIMESTAMP(6)", "UTC_TIMESTAMP(6)"))
+text = path.read_text()
+text = text.replace("CURRENT_TIMESTAMP(6)", "UTC_TIMESTAMP(6)")
+text = text.replace("CURRENT_TIMESTAMP()", "UTC_TIMESTAMP()")
+path.write_text(text)
 PY
 done

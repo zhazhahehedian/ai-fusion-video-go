@@ -26,6 +26,7 @@ type Deps struct {
 	Projects   *project.Service
 	Commands   *resource.Service
 	Scripts    *resource.ScriptQuery
+	Content    *resource.ContentQuery
 	Generation *generation.Service
 	Media      *media.Service
 }
@@ -74,8 +75,57 @@ func NewRouter(deps Deps) http.Handler {
 		pr.Get("/api/script/{id}", deps.handleScriptGet)
 		pr.Put("/api/script", deps.handleScriptUpdate)
 
+		pr.Get("/api/storyboard/project/{projectId}", deps.handleStoryboardByProject)
+		pr.Get("/api/storyboard/episode/{episodeId}/scenes", deps.handleStoryboardScenesByEpisode)
+		pr.Get("/api/storyboard/episode/{id}", deps.handleStoryboardEpisodeGet)
+		pr.Post("/api/storyboard/episode", deps.handleStoryboardEpisodeCreate)
+		pr.Put("/api/storyboard/episode", deps.handleStoryboardEpisodeUpdate)
+		pr.Delete("/api/storyboard/episode/{id}", deps.handleStoryboardEpisodeDelete)
+		pr.Put("/api/storyboard/episode/{id}/bindScriptEpisode", deps.handleStoryboardBindScriptEpisode)
+		pr.Get("/api/storyboard/scene/{sceneId}/items", deps.handleStoryboardItemsByScene)
+		pr.Get("/api/storyboard/scene/{id}", deps.handleStoryboardSceneGet)
+		pr.Post("/api/storyboard/scene", deps.handleStoryboardSceneCreate)
+		pr.Put("/api/storyboard/scene", deps.handleStoryboardSceneUpdate)
+		pr.Delete("/api/storyboard/scene/{id}", deps.handleStoryboardSceneDelete)
+		pr.Get("/api/storyboard/item/{id}", deps.handleStoryboardItemGet)
+		pr.Post("/api/storyboard/item", deps.handleStoryboardItemCreate)
+		pr.Put("/api/storyboard/item", deps.handleStoryboardItemUpdate)
+		pr.Put("/api/storyboard/item/{id}/updateFrame", deps.handleStoryboardItemFrame)
+		pr.Delete("/api/storyboard/item/{id}", deps.handleStoryboardItemDelete)
+		pr.Get("/api/storyboard/{storyboardId}/episodes", deps.handleStoryboardEpisodes)
+		pr.Get("/api/storyboard/{storyboardId}/scenes", deps.handleStoryboardScenesByBoard)
+		pr.Get("/api/storyboard/{storyboardId}/items", deps.handleStoryboardItemsByBoard)
+		pr.Get("/api/storyboard/{id}", deps.handleStoryboardGet)
+		pr.Post("/api/storyboard", deps.handleStoryboardCreate)
+		pr.Put("/api/storyboard", deps.handleStoryboardUpdate)
+		pr.Delete("/api/storyboard/{id}", deps.handleStoryboardDelete)
+
+		pr.Get("/api/asset/list", deps.handleAssetList)
+		pr.Get("/api/asset/list-with-items", deps.handleAssetListWithItems)
+		pr.Get("/api/asset/item/{id}", deps.handleAssetItemGet)
+		pr.Post("/api/asset/item", deps.handleAssetItemCreate)
+		pr.Put("/api/asset/item", deps.handleAssetItemUpdate)
+		pr.Delete("/api/asset/item/{id}", deps.handleAssetItemDelete)
+		pr.Get("/api/asset/{assetId}/items", deps.handleAssetItems)
+		pr.Get("/api/asset/{id}", deps.handleAssetGet)
+		pr.Post("/api/asset", deps.handleAssetCreate)
+		pr.Put("/api/asset", deps.handleAssetUpdate)
+		pr.Delete("/api/asset/{id}", deps.handleAssetDelete)
+
 		pr.Post("/api/generation/echo", deps.handleGenerationEcho)
 		pr.Get("/api/generation/submissions/{id}", deps.handleGenerationSubmissionGet)
+		pr.Post("/api/generation/image", deps.handleImageTaskCreate)
+		pr.Put("/api/generation/image", deps.handleImageTaskUpdate)
+		pr.Get("/api/generation/image/page", deps.handleImageTaskPage)
+		pr.Get("/api/generation/image/{id}/items", deps.handleImageItems)
+		pr.Get("/api/generation/image/{taskId}", deps.handleImageTaskGet)
+		pr.Delete("/api/generation/image/{id}", deps.handleImageTaskDelete)
+		pr.Post("/api/generation/video", deps.handleVideoTaskCreate)
+		pr.Put("/api/generation/video", deps.handleVideoTaskUpdate)
+		pr.Get("/api/generation/video/page", deps.handleVideoTaskPage)
+		pr.Get("/api/generation/video/{id}/items", deps.handleVideoItems)
+		pr.Get("/api/generation/video/{taskId}", deps.handleVideoTaskGet)
+		pr.Delete("/api/generation/video/{id}", deps.handleVideoTaskDelete)
 
 		pr.Post("/api/media/jobs", deps.handleMediaEnqueue)
 		pr.Get("/api/media/jobs/{id}", deps.handleMediaJobGet)
