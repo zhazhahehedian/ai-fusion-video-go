@@ -35,7 +35,8 @@ type Config struct {
 func Load() (Config, error) {
 	cfg := Config{
 		HTTPAddr: getenv("HTTP_ADDR", ":18080"),
-		// loc=UTC：任务 DATETIME 存的是 UTC 墙钟（UTC_TIMESTAMP），与 Java 的 LocalDateTime 对照。
+		// loc=UTC：驱动把 DATETIME 标成 UTC。OpenMySQL 会补上 time_zone=+00:00，
+		// 让内容表的 CURRENT_TIMESTAMP 墙钟和这个标注一致。作业表仍写 UTC_TIMESTAMP。
 		DatabaseURL:       getenv("DATABASE_URL", "fusion:123456@tcp(127.0.0.1:43306)/ai_fusion_video?parseTime=true&loc=UTC"),
 		RedisAddr:         getenv("REDIS_ADDR", "127.0.0.1:46379"),
 		RedisPassword:     getenv("REDIS_PASSWORD", "123456"),

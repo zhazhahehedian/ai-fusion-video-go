@@ -128,19 +128,16 @@ func (w *Worker) execute(ctx context.Context, initial Job) error {
 	job := initial
 	claim := job.Claim()
 
-	if job.CancelRequested && (job.Phase == PhaseNew || job.Phase == PhasePreparing) {
-		return w.repo.Fail(ctx, claim, StateCancelled, "CANCELLED_BEFORE_SUBMISSION", "已取消排队，尚未提交供应商")
+	permitted, err := w.repo.ExecutionPermitted(ctx, job.SubmissionID)
+	if err != nil {
+		return err
 	}
 	now, err := w.repo.Now(ctx)
 	if err != nil {
 		return err
 	}
-	if now.After(job.DeadlineAt) {
-		state := StateFailed
-		if job.Phase != PhaseNew && job.Phase != PhasePreparing {
-			state = StateUnknownSubmission
-		}
-		return w.repo.Fail(ctx, claim, state, "GENERATION_DEADLINE_EXCEEDED", "生成任务超过截止时间")
+	if stop, state, code, msg := gateExecution(permitted, job.CancelRequested, job.Phase, now, job.DeadlineAt); stop {
+		return w.repo.Fail(ctx, claim, state, code, msg)
 	}
 
 	switch job.Phase {
@@ -157,6 +154,30 @@ func (w *Worker) execute(ctx context.Context, initial Job) error {
 	default:
 		return w.repo.Fail(ctx, claim, StateFailed, "UNSUPPORTED_PHASE", "不支持的执行阶段: "+job.Phase)
 	}
+}
+
+// gateExecution 对齐 Java RemoteGenerationWorker.execute 的前三段判断：
+// 身份失效、准备阶段取消、以及除 INGESTING 以外的截止时间。
+// 已进入供应商轮询后的身份失效在这里直接停止。Java 会先 requestStop 再靠后续轮询收尾；
+// 本仓库还没有真实供应商轮询，不能把已失效的任务继续标成成功。
+func gateExecution(permitted, cancelRequested bool, phase string, now, deadline time.Time) (stop bool, state, code, msg string) {
+	preparing := phase == PhaseNew || phase == PhasePreparing
+	if !permitted && !cancelRequested {
+		if preparing {
+			return true, StateCancelled, "CANCELLED_BEFORE_SUBMISSION", "已取消排队，尚未提交供应商"
+		}
+		return true, StateCancelled, "EXECUTION_NOT_PERMITTED", "执行身份已失效，任务已停止"
+	}
+	if preparing && cancelRequested {
+		return true, StateCancelled, "CANCELLED_BEFORE_SUBMISSION", "已取消排队，尚未提交供应商"
+	}
+	if phase != PhaseIngesting && now.After(deadline) {
+		if preparing {
+			return true, StateFailed, "GENERATION_DEADLINE_EXCEEDED", "准备超过等待期限，未提交供应商"
+		}
+		return true, StateUnknownSubmission, "GENERATION_DEADLINE_EXCEEDED", "远端结果未知，已结束本地等待，原请求不会自动重发"
+	}
+	return false, "", "", ""
 }
 
 func (w *Worker) submitStub(ctx context.Context, claim Claim, job Job) error {

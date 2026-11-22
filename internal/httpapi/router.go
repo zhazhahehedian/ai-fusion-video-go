@@ -29,6 +29,8 @@ type Deps struct {
 	Content    *resource.ContentQuery
 	Generation *generation.Service
 	Media      *media.Service
+	// MaxBodyBytes 为 0 时使用 DefaultMaxBodyBytes。
+	MaxBodyBytes int64
 }
 
 func NewRouter(deps Deps) http.Handler {
@@ -39,6 +41,7 @@ func NewRouter(deps Deps) http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(AccessLog(deps.Logger))
 	r.Use(Recover)
+	r.Use(LimitRequestBody(maxBodyBytes(deps)))
 
 	r.Get("/healthz", deps.handleHealthz)
 
@@ -98,6 +101,8 @@ func NewRouter(deps Deps) http.Handler {
 		pr.Get("/api/storyboard/{id}", deps.handleStoryboardGet)
 		pr.Post("/api/storyboard", deps.handleStoryboardCreate)
 		pr.Put("/api/storyboard", deps.handleStoryboardUpdate)
+		pr.Post("/api/storyboard/{id}/clearContent", deps.handleStoryboardClear)
+		pr.Post("/api/storyboard/episode/{id}/clearContent", deps.handleStoryboardEpisodeClear)
 
 		pr.Get("/api/asset/list", deps.handleAssetList)
 		pr.Get("/api/asset/list-with-items", deps.handleAssetListWithItems)

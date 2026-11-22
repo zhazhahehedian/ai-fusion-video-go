@@ -176,7 +176,13 @@ func (q *Queries) CreateVideoTask(ctx context.Context, arg CreateVideoTaskParams
 }
 
 const getImageTaskByID = `-- name: GetImageTaskByID :one
-SELECT id, task_id, user_id, project_id, prompt, prompt_template_id, ref_image_urls, ratio, resolution, aspect_ratio, width, height, count, success_count, status, error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted, create_time, update_time FROM afv_image_task
+SELECT
+  id, task_id, user_id, project_id, prompt, prompt_template_id,
+  COALESCE(ref_image_urls, CAST('null' AS JSON)) AS ref_image_urls,
+  ratio, resolution, aspect_ratio, width, height, count, success_count, status,
+  error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted,
+  create_time, update_time
+FROM afv_image_task
 WHERE id = ? AND deleted = 0
 `
 
@@ -213,7 +219,13 @@ func (q *Queries) GetImageTaskByID(ctx context.Context, id int64) (AfvImageTask,
 }
 
 const getImageTaskByPublicID = `-- name: GetImageTaskByPublicID :one
-SELECT id, task_id, user_id, project_id, prompt, prompt_template_id, ref_image_urls, ratio, resolution, aspect_ratio, width, height, count, success_count, status, error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted, create_time, update_time FROM afv_image_task
+SELECT
+  id, task_id, user_id, project_id, prompt, prompt_template_id,
+  COALESCE(ref_image_urls, CAST('null' AS JSON)) AS ref_image_urls,
+  ratio, resolution, aspect_ratio, width, height, count, success_count, status,
+  error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted,
+  create_time, update_time
+FROM afv_image_task
 WHERE task_id = ? AND deleted = 0
 `
 
@@ -250,7 +262,16 @@ func (q *Queries) GetImageTaskByPublicID(ctx context.Context, taskID string) (Af
 }
 
 const getVideoTaskByID = `-- name: GetVideoTaskByID :one
-SELECT id, task_id, user_id, project_id, prompt, prompt_template_id, generate_mode, first_frame_image_url, last_frame_image_url, reference_image_urls, reference_video_urls, reference_audio_urls, ratio, resolution, duration, watermark, generate_audio, seed, camera_fixed, count, success_count, status, error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted, create_time, update_time FROM afv_video_task
+SELECT
+  id, task_id, user_id, project_id, prompt, prompt_template_id, generate_mode,
+  first_frame_image_url, last_frame_image_url,
+  COALESCE(reference_image_urls, CAST('null' AS JSON)) AS reference_image_urls,
+  COALESCE(reference_video_urls, CAST('null' AS JSON)) AS reference_video_urls,
+  COALESCE(reference_audio_urls, CAST('null' AS JSON)) AS reference_audio_urls,
+  ratio, resolution, duration, watermark, generate_audio, seed, camera_fixed,
+  count, success_count, status, error_msg, model_id, workflow_version_id, category,
+  owner_type, owner_id, deleted, create_time, update_time
+FROM afv_video_task
 WHERE id = ? AND deleted = 0
 `
 
@@ -294,7 +315,16 @@ func (q *Queries) GetVideoTaskByID(ctx context.Context, id int64) (AfvVideoTask,
 }
 
 const getVideoTaskByPublicID = `-- name: GetVideoTaskByPublicID :one
-SELECT id, task_id, user_id, project_id, prompt, prompt_template_id, generate_mode, first_frame_image_url, last_frame_image_url, reference_image_urls, reference_video_urls, reference_audio_urls, ratio, resolution, duration, watermark, generate_audio, seed, camera_fixed, count, success_count, status, error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted, create_time, update_time FROM afv_video_task
+SELECT
+  id, task_id, user_id, project_id, prompt, prompt_template_id, generate_mode,
+  first_frame_image_url, last_frame_image_url,
+  COALESCE(reference_image_urls, CAST('null' AS JSON)) AS reference_image_urls,
+  COALESCE(reference_video_urls, CAST('null' AS JSON)) AS reference_video_urls,
+  COALESCE(reference_audio_urls, CAST('null' AS JSON)) AS reference_audio_urls,
+  ratio, resolution, duration, watermark, generate_audio, seed, camera_fixed,
+  count, success_count, status, error_msg, model_id, workflow_version_id, category,
+  owner_type, owner_id, deleted, create_time, update_time
+FROM afv_video_task
 WHERE task_id = ? AND deleted = 0
 `
 
@@ -425,7 +455,13 @@ func (q *Queries) ListVideoItemsByTask(ctx context.Context, taskID int64) ([]Afv
 }
 
 const lockImageTaskByID = `-- name: LockImageTaskByID :one
-SELECT id, task_id, user_id, project_id, prompt, prompt_template_id, ref_image_urls, ratio, resolution, aspect_ratio, width, height, count, success_count, status, error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted, create_time, update_time FROM afv_image_task
+SELECT
+  id, task_id, user_id, project_id, prompt, prompt_template_id,
+  COALESCE(ref_image_urls, CAST('null' AS JSON)) AS ref_image_urls,
+  ratio, resolution, aspect_ratio, width, height, count, success_count, status,
+  error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted,
+  create_time, update_time
+FROM afv_image_task
 WHERE id = ? AND deleted = 0
 FOR UPDATE
 `
@@ -463,7 +499,16 @@ func (q *Queries) LockImageTaskByID(ctx context.Context, id int64) (AfvImageTask
 }
 
 const lockVideoTaskByID = `-- name: LockVideoTaskByID :one
-SELECT id, task_id, user_id, project_id, prompt, prompt_template_id, generate_mode, first_frame_image_url, last_frame_image_url, reference_image_urls, reference_video_urls, reference_audio_urls, ratio, resolution, duration, watermark, generate_audio, seed, camera_fixed, count, success_count, status, error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted, create_time, update_time FROM afv_video_task
+SELECT
+  id, task_id, user_id, project_id, prompt, prompt_template_id, generate_mode,
+  first_frame_image_url, last_frame_image_url,
+  COALESCE(reference_image_urls, CAST('null' AS JSON)) AS reference_image_urls,
+  COALESCE(reference_video_urls, CAST('null' AS JSON)) AS reference_video_urls,
+  COALESCE(reference_audio_urls, CAST('null' AS JSON)) AS reference_audio_urls,
+  ratio, resolution, duration, watermark, generate_audio, seed, camera_fixed,
+  count, success_count, status, error_msg, model_id, workflow_version_id, category,
+  owner_type, owner_id, deleted, create_time, update_time
+FROM afv_video_task
 WHERE id = ? AND deleted = 0
 FOR UPDATE
 `
@@ -508,7 +553,13 @@ func (q *Queries) LockVideoTaskByID(ctx context.Context, id int64) (AfvVideoTask
 }
 
 const pageImageTasksByUser = `-- name: PageImageTasksByUser :many
-SELECT id, task_id, user_id, project_id, prompt, prompt_template_id, ref_image_urls, ratio, resolution, aspect_ratio, width, height, count, success_count, status, error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted, create_time, update_time FROM afv_image_task
+SELECT
+  id, task_id, user_id, project_id, prompt, prompt_template_id,
+  COALESCE(ref_image_urls, CAST('null' AS JSON)) AS ref_image_urls,
+  ratio, resolution, aspect_ratio, width, height, count, success_count, status,
+  error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted,
+  create_time, update_time
+FROM afv_image_task
 WHERE user_id = ? AND deleted = 0
 ORDER BY id DESC
 LIMIT ? OFFSET ?
@@ -569,7 +620,16 @@ func (q *Queries) PageImageTasksByUser(ctx context.Context, arg PageImageTasksBy
 }
 
 const pageVideoTasksByUser = `-- name: PageVideoTasksByUser :many
-SELECT id, task_id, user_id, project_id, prompt, prompt_template_id, generate_mode, first_frame_image_url, last_frame_image_url, reference_image_urls, reference_video_urls, reference_audio_urls, ratio, resolution, duration, watermark, generate_audio, seed, camera_fixed, count, success_count, status, error_msg, model_id, workflow_version_id, category, owner_type, owner_id, deleted, create_time, update_time FROM afv_video_task
+SELECT
+  id, task_id, user_id, project_id, prompt, prompt_template_id, generate_mode,
+  first_frame_image_url, last_frame_image_url,
+  COALESCE(reference_image_urls, CAST('null' AS JSON)) AS reference_image_urls,
+  COALESCE(reference_video_urls, CAST('null' AS JSON)) AS reference_video_urls,
+  COALESCE(reference_audio_urls, CAST('null' AS JSON)) AS reference_audio_urls,
+  ratio, resolution, duration, watermark, generate_audio, seed, camera_fixed,
+  count, success_count, status, error_msg, model_id, workflow_version_id, category,
+  owner_type, owner_id, deleted, create_time, update_time
+FROM afv_video_task
 WHERE user_id = ? AND deleted = 0
 ORDER BY id DESC
 LIMIT ? OFFSET ?

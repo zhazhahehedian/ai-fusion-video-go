@@ -21,7 +21,7 @@ import (
 // 本机没有 Docker 时跳过。会话时区固定为 +08:00，用来确认写入用的是 UTC_TIMESTAMP 而不是 CURRENT_TIMESTAMP。
 func testMySQL(t *testing.T) *sql.DB {
 	t.Helper()
-	adminDSN := "afvtest:afvtest@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC&multiStatements=true&time_zone=%27%2B08%3A00%27"
+	adminDSN := mysqlAdminDSN()
 	admin, err := sql.Open("mysql", adminDSN)
 	if err != nil {
 		t.Fatal(err)
@@ -45,7 +45,7 @@ func testMySQL(t *testing.T) *sql.DB {
 		_ = admin.Close()
 	})
 
-	dsn := "afvtest:afvtest@tcp(127.0.0.1:3306)/" + name + "?parseTime=true&loc=UTC&multiStatements=true&time_zone=%27%2B08%3A00%27"
+	dsn := mysqlSchemaDSN(adminDSN, name)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -329,4 +329,25 @@ func assertCount(t *testing.T, db *sql.DB, table string, want int) {
 	if got != want {
 		t.Fatalf("%s 行数 = %d，想要 %d", table, got, want)
 	}
+}
+
+func mysqlAdminDSN() string {
+	if v := strings.TrimSpace(os.Getenv("AFV_MYSQL_ADMIN_DSN")); v != "" {
+		return v
+	}
+	return "afvtest:afvtest@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC&multiStatements=true&time_zone=%27%2B08%3A00%27"
+}
+
+func mysqlSchemaDSN(adminDSN, name string) string {
+	marker := ")/"
+	i := strings.Index(adminDSN, marker)
+	if i < 0 {
+		return adminDSN
+	}
+	rest := adminDSN[i+len(marker):]
+	query := ""
+	if j := strings.Index(rest, "?"); j >= 0 {
+		query = rest[j:]
+	}
+	return adminDSN[:i+len(marker)] + name + query
 }

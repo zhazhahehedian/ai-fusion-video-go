@@ -327,7 +327,12 @@ func (q *Queries) CreateStoryboardScene(ctx context.Context, arg CreateStoryboar
 }
 
 const getLatestStoryboardByProject = `-- name: GetLatestStoryboardByProject :one
-SELECT id, project_id, script_id, title, description, custom_columns, scope, owner_type, owner_id, total_duration, status, deleted, create_time, update_time, version FROM afv_storyboard
+SELECT
+  id, project_id, script_id, title, description,
+  COALESCE(custom_columns, CAST('null' AS JSON)) AS custom_columns,
+  scope, owner_type, owner_id, total_duration, status, deleted,
+  create_time, update_time, version
+FROM afv_storyboard
 WHERE project_id = ? AND deleted = 0
 ORDER BY id DESC
 LIMIT 1
@@ -357,7 +362,12 @@ func (q *Queries) GetLatestStoryboardByProject(ctx context.Context, projectID sq
 }
 
 const getStoryboardByID = `-- name: GetStoryboardByID :one
-SELECT id, project_id, script_id, title, description, custom_columns, scope, owner_type, owner_id, total_duration, status, deleted, create_time, update_time, version FROM afv_storyboard
+SELECT
+  id, project_id, script_id, title, description,
+  COALESCE(custom_columns, CAST('null' AS JSON)) AS custom_columns,
+  scope, owner_type, owner_id, total_duration, status, deleted,
+  create_time, update_time, version
+FROM afv_storyboard
 WHERE id = ? AND deleted = 0
 `
 
@@ -420,7 +430,18 @@ func (q *Queries) GetStoryboardEpisodeByID(ctx context.Context, id int64) (AfvSt
 }
 
 const getStoryboardItemByID = `-- name: GetStoryboardItemByID :one
-SELECT id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order, shot_number, auto_shot_number, image_url, reference_image_url, video_url, generated_image_url, first_frame_image_url, last_frame_image_url, first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration, content, scene_expectation, sound, dialogue, sound_effect, music, camera_movement, camera_angle, camera_equipment, focal_length, transition, character_ids, scene_asset_item_id, prop_ids, remark, custom_data, ai_generated, status, deleted, create_time, update_time, video_prompt, version FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE id = ? AND deleted = 0
 `
 
@@ -553,7 +574,18 @@ func (q *Queries) ListStoryboardEpisodes(ctx context.Context, storyboardID int64
 }
 
 const listStoryboardItemsByBoard = `-- name: ListStoryboardItemsByBoard :many
-SELECT id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order, shot_number, auto_shot_number, image_url, reference_image_url, video_url, generated_image_url, first_frame_image_url, last_frame_image_url, first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration, content, scene_expectation, sound, dialogue, sound_effect, music, camera_movement, camera_angle, camera_equipment, focal_length, transition, character_ids, scene_asset_item_id, prop_ids, remark, custom_data, ai_generated, status, deleted, create_time, update_time, video_prompt, version FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE storyboard_id = ? AND deleted = 0
 ORDER BY sort_order ASC, id ASC
 `
@@ -624,7 +656,18 @@ func (q *Queries) ListStoryboardItemsByBoard(ctx context.Context, storyboardID i
 }
 
 const listStoryboardItemsByScene = `-- name: ListStoryboardItemsByScene :many
-SELECT id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order, shot_number, auto_shot_number, image_url, reference_image_url, video_url, generated_image_url, first_frame_image_url, last_frame_image_url, first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration, content, scene_expectation, sound, dialogue, sound_effect, music, camera_movement, camera_angle, camera_equipment, focal_length, transition, character_ids, scene_asset_item_id, prop_ids, remark, custom_data, ai_generated, status, deleted, create_time, update_time, video_prompt, version FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE storyboard_scene_id = ? AND deleted = 0
 ORDER BY sort_order ASC, id ASC
 `
@@ -783,7 +826,12 @@ func (q *Queries) ListStoryboardScenesByEpisode(ctx context.Context, episodeID i
 }
 
 const lockStoryboardByID = `-- name: LockStoryboardByID :one
-SELECT id, project_id, script_id, title, description, custom_columns, scope, owner_type, owner_id, total_duration, status, deleted, create_time, update_time, version FROM afv_storyboard
+SELECT
+  id, project_id, script_id, title, description,
+  COALESCE(custom_columns, CAST('null' AS JSON)) AS custom_columns,
+  scope, owner_type, owner_id, total_duration, status, deleted,
+  create_time, update_time, version
+FROM afv_storyboard
 WHERE id = ? AND deleted = 0
 FOR UPDATE
 `
@@ -847,8 +895,72 @@ func (q *Queries) LockStoryboardEpisodeByID(ctx context.Context, id int64) (AfvS
 	return i, err
 }
 
+const lockStoryboardEpisodesByBoard = `-- name: LockStoryboardEpisodesByBoard :many
+SELECT id, storyboard_id, script_episode_id, episode_number, title, synopsis, sort_order, status, deleted, deleted_id, create_time, update_time, composed_video_url, compose_status, compose_error_msg, composed_at, bgm_task_id, bgm_audio_url, bgm_sfx_audio_url, bgm_error_msg, version, compose_job_id FROM afv_storyboard_episode
+WHERE storyboard_id = ? AND IFNULL(deleted, 0) = 0
+ORDER BY id
+FOR UPDATE
+`
+
+func (q *Queries) LockStoryboardEpisodesByBoard(ctx context.Context, storyboardID int64) ([]AfvStoryboardEpisode, error) {
+	rows, err := q.db.QueryContext(ctx, lockStoryboardEpisodesByBoard, storyboardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AfvStoryboardEpisode{}
+	for rows.Next() {
+		var i AfvStoryboardEpisode
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoryboardID,
+			&i.ScriptEpisodeID,
+			&i.EpisodeNumber,
+			&i.Title,
+			&i.Synopsis,
+			&i.SortOrder,
+			&i.Status,
+			&i.Deleted,
+			&i.DeletedID,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.ComposedVideoUrl,
+			&i.ComposeStatus,
+			&i.ComposeErrorMsg,
+			&i.ComposedAt,
+			&i.BgmTaskID,
+			&i.BgmAudioUrl,
+			&i.BgmSfxAudioUrl,
+			&i.BgmErrorMsg,
+			&i.Version,
+			&i.ComposeJobID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockStoryboardItemByID = `-- name: LockStoryboardItemByID :one
-SELECT id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order, shot_number, auto_shot_number, image_url, reference_image_url, video_url, generated_image_url, first_frame_image_url, last_frame_image_url, first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration, content, scene_expectation, sound, dialogue, sound_effect, music, camera_movement, camera_angle, camera_equipment, focal_length, transition, character_ids, scene_asset_item_id, prop_ids, remark, custom_data, ai_generated, status, deleted, create_time, update_time, video_prompt, version FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE id = ? AND deleted = 0
 FOR UPDATE
 `
@@ -902,8 +1014,102 @@ func (q *Queries) LockStoryboardItemByID(ctx context.Context, id int64) (AfvStor
 	return i, err
 }
 
+const lockStoryboardItemsByBoard = `-- name: LockStoryboardItemsByBoard :many
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
+WHERE storyboard_id = ? AND deleted = 0
+ORDER BY id
+FOR UPDATE
+`
+
+func (q *Queries) LockStoryboardItemsByBoard(ctx context.Context, storyboardID int64) ([]AfvStoryboardItem, error) {
+	rows, err := q.db.QueryContext(ctx, lockStoryboardItemsByBoard, storyboardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AfvStoryboardItem{}
+	for rows.Next() {
+		var i AfvStoryboardItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoryboardID,
+			&i.StoryboardEpisodeID,
+			&i.StoryboardSceneID,
+			&i.SortOrder,
+			&i.ShotNumber,
+			&i.AutoShotNumber,
+			&i.ImageUrl,
+			&i.ReferenceImageUrl,
+			&i.VideoUrl,
+			&i.GeneratedImageUrl,
+			&i.FirstFrameImageUrl,
+			&i.LastFrameImageUrl,
+			&i.FirstFramePrompt,
+			&i.LastFramePrompt,
+			&i.GeneratedVideoUrl,
+			&i.ShotType,
+			&i.Duration,
+			&i.Content,
+			&i.SceneExpectation,
+			&i.Sound,
+			&i.Dialogue,
+			&i.SoundEffect,
+			&i.Music,
+			&i.CameraMovement,
+			&i.CameraAngle,
+			&i.CameraEquipment,
+			&i.FocalLength,
+			&i.Transition,
+			&i.CharacterIds,
+			&i.SceneAssetItemID,
+			&i.PropIds,
+			&i.Remark,
+			&i.CustomData,
+			&i.AiGenerated,
+			&i.Status,
+			&i.Deleted,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.VideoPrompt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockStoryboardItemsByEpisode = `-- name: LockStoryboardItemsByEpisode :many
-SELECT id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order, shot_number, auto_shot_number, image_url, reference_image_url, video_url, generated_image_url, first_frame_image_url, last_frame_image_url, first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration, content, scene_expectation, sound, dialogue, sound_effect, music, camera_movement, camera_angle, camera_equipment, focal_length, transition, character_ids, scene_asset_item_id, prop_ids, remark, custom_data, ai_generated, status, deleted, create_time, update_time, video_prompt, version FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE deleted = 0
   AND (
     storyboard_episode_id = ?
@@ -987,7 +1193,18 @@ func (q *Queries) LockStoryboardItemsByEpisode(ctx context.Context, arg LockStor
 }
 
 const lockStoryboardItemsByScene = `-- name: LockStoryboardItemsByScene :many
-SELECT id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order, shot_number, auto_shot_number, image_url, reference_image_url, video_url, generated_image_url, first_frame_image_url, last_frame_image_url, first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration, content, scene_expectation, sound, dialogue, sound_effect, music, camera_movement, camera_angle, camera_equipment, focal_length, transition, character_ids, scene_asset_item_id, prop_ids, remark, custom_data, ai_generated, status, deleted, create_time, update_time, video_prompt, version FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE storyboard_scene_id = ? AND deleted = 0
 ORDER BY id ASC
 FOR UPDATE
@@ -1084,6 +1301,51 @@ func (q *Queries) LockStoryboardSceneByID(ctx context.Context, id int64) (AfvSto
 		&i.Version,
 	)
 	return i, err
+}
+
+const lockStoryboardScenesByBoard = `-- name: LockStoryboardScenesByBoard :many
+SELECT id, episode_id, storyboard_id, scene_number, scene_heading, location, time_of_day, int_ext, sort_order, status, deleted, create_time, update_time, version FROM afv_storyboard_scene
+WHERE storyboard_id = ? AND deleted = 0
+ORDER BY id
+FOR UPDATE
+`
+
+func (q *Queries) LockStoryboardScenesByBoard(ctx context.Context, storyboardID int64) ([]AfvStoryboardScene, error) {
+	rows, err := q.db.QueryContext(ctx, lockStoryboardScenesByBoard, storyboardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AfvStoryboardScene{}
+	for rows.Next() {
+		var i AfvStoryboardScene
+		if err := rows.Scan(
+			&i.ID,
+			&i.EpisodeID,
+			&i.StoryboardID,
+			&i.SceneNumber,
+			&i.SceneHeading,
+			&i.Location,
+			&i.TimeOfDay,
+			&i.IntExt,
+			&i.SortOrder,
+			&i.Status,
+			&i.Deleted,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const lockStoryboardScenesByEpisode = `-- name: LockStoryboardScenesByEpisode :many

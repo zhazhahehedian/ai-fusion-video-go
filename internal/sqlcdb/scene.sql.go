@@ -179,6 +179,65 @@ func (q *Queries) ListScenesByEpisode(ctx context.Context, episodeID int64) ([]A
 	return items, nil
 }
 
+const listScenesByScript = `-- name: ListScenesByScript :many
+SELECT
+  id, episode_id, script_id, scene_number, scene_heading, location, time_of_day, int_ext,
+  COALESCE(characters, CAST('[]' AS JSON)) AS characters,
+  COALESCE(character_asset_ids, CAST('[]' AS JSON)) AS character_asset_ids,
+  scene_asset_id,
+  COALESCE(prop_asset_ids, CAST('[]' AS JSON)) AS prop_asset_ids,
+  scene_description,
+  COALESCE(dialogues, CAST('[]' AS JSON)) AS dialogues,
+  sort_order, status, version, deleted, create_time, update_time
+FROM afv_script_scene_item
+WHERE script_id = ? AND deleted = 0
+ORDER BY id ASC
+`
+
+func (q *Queries) ListScenesByScript(ctx context.Context, scriptID int64) ([]AfvScriptSceneItem, error) {
+	rows, err := q.db.QueryContext(ctx, listScenesByScript, scriptID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AfvScriptSceneItem{}
+	for rows.Next() {
+		var i AfvScriptSceneItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.EpisodeID,
+			&i.ScriptID,
+			&i.SceneNumber,
+			&i.SceneHeading,
+			&i.Location,
+			&i.TimeOfDay,
+			&i.IntExt,
+			&i.Characters,
+			&i.CharacterAssetIds,
+			&i.SceneAssetID,
+			&i.PropAssetIds,
+			&i.SceneDescription,
+			&i.Dialogues,
+			&i.SortOrder,
+			&i.Status,
+			&i.Version,
+			&i.Deleted,
+			&i.CreateTime,
+			&i.UpdateTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockScriptSceneByID = `-- name: LockScriptSceneByID :one
 SELECT
   id, episode_id, script_id, scene_number, scene_heading, location, time_of_day, int_ext,

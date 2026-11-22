@@ -1,0 +1,32 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      # 会话固定为 +08:00，集成测试才能证明作业写入的是 UTC_TIMESTAMP。
+      AFV_MYSQL_ADMIN_DSN: root:root@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC&multiStatements=true&time_zone=%27%2B08%3A00%27
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.0"
+      - name: test
+        run: go test -race ./...

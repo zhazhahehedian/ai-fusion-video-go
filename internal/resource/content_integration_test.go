@@ -264,9 +264,181 @@ func TestContentCommandPipeline(t *testing.T) {
 	}
 }
 
+func TestStoryboardClearKeepsBoard(t *testing.T) {
+	db := openContentMySQL(t)
+	for _, path := range []string{
+		"../../db/migrations/00001_sys_user_and_project.sql",
+		"../../db/migrations/00002_resource_command_and_script.sql",
+		"../../db/migrations/00003_script_scene.sql",
+		"../../db/migrations/00004_generation_jobs.sql",
+		"../../db/migrations/00005_media_job.sql",
+		"../../db/migrations/00006_storyboard_asset_tasks.sql",
+	} {
+		if err := applyContentMigration(db, path); err != nil {
+			t.Fatalf("迁移 %s: %v", path, err)
+		}
+	}
+	registry, err := resource.NewRegistry(
+		handlers.ProjectCreate{},
+		handlers.StoryboardCreate{},
+		handlers.StoryboardClear{},
+		handlers.StoryboardEpisodeCreate{},
+		handlers.StoryboardSceneCreate{},
+		handlers.StoryboardItemCreate{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := resource.NewService(db, registry)
+	ctx := context.Background()
+	const actor int64 = 7
+	project, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID: "proj-clear", ResType: resource.TypeProject, Fields: map[string]any{"name": "清空"},
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectID := resultID(t, project.Result)
+	board, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID: "board-clear", ResType: resource.TypeStoryboard, ProjectID: &projectID,
+		Fields: map[string]any{"title": "稿"},
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	boardID := resultID(t, board.Result)
+	episode, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID: "ep-clear", ResType: resource.TypeStoryboardEpisode,
+		Fields: map[string]any{"storyboardId": boardID, "parentVersion": float64(0), "episodeNumber": float64(1), "title": "集"},
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	episodeID := resultID(t, episode.Result)
+	scene, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID: "scene-clear", ResType: resource.TypeStoryboardScene,
+		Fields: map[string]any{"episodeId": episodeID, "parentVersion": float64(0), "sceneHeading": "内景"},
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sceneID := resultID(t, scene.Result)
+	if _, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID: "shot-clear", ResType: resource.TypeShot,
+		Fields: map[string]any{"storyboardSceneId": sceneID, "parentVersion": float64(0), "content": "雨"},
+	}, resource.Context{ActorUserID: actor}); err != nil {
+		t.Fatal(err)
+	}
+	var version int32
+	if err := db.QueryRow(`SELECT version FROM afv_storyboard WHERE id = ?`, boardID).Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	cleared, err := svc.Execute(ctx, resource.ClearCommand{
+		ReqID: "clear-board", ResType: resource.TypeStoryboard, ID: boardID, Version: version,
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resultID(t, cleared.Result) != boardID {
+		t.Fatalf("clear should return the board, got %v", cleared.Result)
+	}
+	var boardDeleted, childDeleted int
+	if err := db.QueryRow(`SELECT deleted FROM afv_storyboard WHERE id = ?`, boardID).Scan(&boardDeleted); err != nil {
+		t.Fatal(err)
+	}
+	if boardDeleted != 0 {
+		t.Fatal("clear must keep the storyboard row")
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM afv_storyboard_item WHERE storyboard_id = ? AND deleted = 0`, boardID).Scan(&childDeleted); err != nil {
+		t.Fatal(err)
+	}
+	if childDeleted != 0 {
+		t.Fatalf("shots still visible: %d", childDeleted)
+	}
+	var revisions int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM afv_resource_revision WHERE command_id = ? AND resource_type IN ('shot', 'storyboardScene', 'storyboardEpisode')`, cleared.CommandID).Scan(&revisions); err != nil {
+		t.Fatal(err)
+	}
+	if revisions != 3 {
+		t.Fatalf("child revisions = %d, want 3", revisions)
+	}
+}
+
+func TestScriptSourceWritesChildRevisions(t *testing.T) {
+	db := openContentMySQL(t)
+	for _, path := range []string{
+		"../../db/migrations/00001_sys_user_and_project.sql",
+		"../../db/migrations/00002_resource_command_and_script.sql",
+		"../../db/migrations/00003_script_scene.sql",
+		"../../db/migrations/00004_generation_jobs.sql",
+		"../../db/migrations/00005_media_job.sql",
+		"../../db/migrations/00006_storyboard_asset_tasks.sql",
+	} {
+		if err := applyContentMigration(db, path); err != nil {
+			t.Fatalf("迁移 %s: %v", path, err)
+		}
+	}
+	registry, err := resource.NewRegistry(
+		handlers.ProjectCreate{},
+		handlers.ScriptSource{},
+		handlers.ScriptEpisodeCreate{},
+		handlers.ScriptSceneCreate{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := resource.NewService(db, registry)
+	ctx := context.Background()
+	const actor int64 = 7
+	project, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID: "proj-src", ResType: resource.TypeProject, Fields: map[string]any{"name": "原文"},
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectID := resultID(t, project.Result)
+	var scriptID int64
+	var scriptVersion int32
+	if err := db.QueryRow(`SELECT id, version FROM afv_script WHERE project_id = ? AND deleted = 0`, projectID).Scan(&scriptID, &scriptVersion); err != nil {
+		t.Fatal(err)
+	}
+	episode, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID: "src-ep", ResType: resource.TypeScriptEpisode,
+		Fields: map[string]any{"scriptId": scriptID, "parentVersion": float64(scriptVersion), "episodeNumber": float64(1), "title": "第一集"},
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID: "src-scene", ResType: resource.TypeScriptScene,
+		Fields: map[string]any{"episodeId": resultID(t, episode.Result), "parentVersion": float64(0)},
+	}, resource.Context{ActorUserID: actor}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT version FROM afv_script WHERE id = ?`, scriptID).Scan(&scriptVersion); err != nil {
+		t.Fatal(err)
+	}
+	replaced, err := svc.Execute(ctx, resource.SourceCommand{
+		ReqID: "src-replace", ResourceID: scriptID, Version: scriptVersion, RawContent: "新的原文",
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sceneRevisions, episodeRevisions int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM afv_resource_revision WHERE command_id = ? AND resource_type = 'script_scene'`, replaced.CommandID).Scan(&sceneRevisions); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM afv_resource_revision WHERE command_id = ? AND resource_type = 'script_episode'`, replaced.CommandID).Scan(&episodeRevisions); err != nil {
+		t.Fatal(err)
+	}
+	if sceneRevisions != 1 || episodeRevisions != 1 {
+		t.Fatalf("scene revisions %d, episode revisions %d", sceneRevisions, episodeRevisions)
+	}
+}
+
 func openContentMySQL(t *testing.T) *sql.DB {
 	t.Helper()
-	adminDSN := "afvtest:afvtest@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC&multiStatements=true&time_zone=%27%2B08%3A00%27"
+	adminDSN := mysqlAdminDSN()
 	admin, err := sql.Open("mysql", adminDSN)
 	if err != nil {
 		t.Fatal(err)
@@ -288,7 +460,7 @@ func openContentMySQL(t *testing.T) *sql.DB {
 		_, _ = admin.Exec("DROP DATABASE `" + name + "`")
 		_ = admin.Close()
 	})
-	dsn := "afvtest:afvtest@tcp(127.0.0.1:3306)/" + name + "?parseTime=true&loc=UTC&multiStatements=true&time_zone=%27%2B08%3A00%27"
+	dsn := mysqlSchemaDSN(adminDSN, name)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -352,4 +524,25 @@ func isNotFound(err error) bool {
 func isForbidden(err error) bool {
 	var ae *apperr.Error
 	return errors.As(err, &ae) && ae.HTTPStatus == 403
+}
+
+func mysqlAdminDSN() string {
+	if v := strings.TrimSpace(os.Getenv("AFV_MYSQL_ADMIN_DSN")); v != "" {
+		return v
+	}
+	return "afvtest:afvtest@tcp(127.0.0.1:3306)/?parseTime=true&loc=UTC&multiStatements=true&time_zone=%27%2B08%3A00%27"
+}
+
+func mysqlSchemaDSN(adminDSN, name string) string {
+	marker := ")/"
+	i := strings.Index(adminDSN, marker)
+	if i < 0 {
+		return adminDSN
+	}
+	rest := adminDSN[i+len(marker):]
+	query := ""
+	if j := strings.Index(rest, "?"); j >= 0 {
+		query = rest[j:]
+	}
+	return adminDSN[:i+len(marker)] + name + query
 }

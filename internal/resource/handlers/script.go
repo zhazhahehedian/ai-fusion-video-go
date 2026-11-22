@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"sort"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/resource"
@@ -178,11 +179,9 @@ func (ScriptSource) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.C
 		return resource.Mutation{}, apperr.Conflict("剧本版本已变化，请刷新后重试")
 	}
 	before := resource.ScriptVO(script)
-
-	if err := q.SoftDeleteScenesByScript(ctx, script.ID); err != nil {
-		return resource.Mutation{}, err
-	}
-	if err := q.SoftDeleteEpisodesByScript(ctx, script.ID); err != nil {
+	projectID := script.ProjectID
+	changes, err := softDeleteScriptTree(ctx, q, script.ID, projectID)
+	if err != nil {
 		return resource.Mutation{}, err
 	}
 
@@ -218,20 +217,79 @@ func (ScriptSource) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.C
 	if err != nil {
 		return resource.Mutation{}, err
 	}
-	projectID := script.ProjectID
+	changes = append(changes, resource.Change{
+		EventID:       eventID,
+		ResourceType:  resource.TypeScript,
+		ResourceID:    script.ID,
+		ProjectID:     &projectID,
+		Version:       nullInt32Value(afterRow.Version),
+		Deleted:       false,
+		ChangedFields: []string{"rawContent", "content", "storySynopsis", "charactersJson", "parsingStatus", "totalEpisodes"},
+		Before:        before,
+		After:         vo,
+	})
 	return resource.Mutation{
-		Result: vo,
-		Changes: []resource.Change{{
-			EventID:       eventID,
-			ResourceType:  resource.TypeScript,
-			ResourceID:    script.ID,
-			ProjectID:     &projectID,
-			Version:       nullInt32Value(afterRow.Version),
-			Deleted:       false,
-			ChangedFields: []string{"rawContent", "content", "storySynopsis", "charactersJson", "parsingStatus", "totalEpisodes"},
-			Before:        before,
-			After:         vo,
-		}},
+		Result:         vo,
+		Changes:        changes,
 		PreviousValues: before,
 	}, nil
+}
+
+func softDeleteScriptTree(ctx context.Context, q *sqlcdb.Queries, scriptID, projectID int64) ([]resource.Change, error) {
+	scenes, err := q.ListScenesByScript(ctx, scriptID)
+	if err != nil {
+		return nil, err
+	}
+	sortScenesByID(scenes)
+	episodes, err := q.ListEpisodesByScript(ctx, scriptID)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(episodes, func(i, j int) bool { return episodes[i].ID < episodes[j].ID })
+	changes := make([]resource.Change, 0, len(scenes)+len(episodes))
+	for _, scene := range scenes {
+		locked, err := q.LockScriptSceneByID(ctx, scene.ID)
+		if err != nil {
+			return nil, err
+		}
+		n, err := q.SoftDeleteScriptScene(ctx, sqlcdb.SoftDeleteScriptSceneParams{
+			ID:      locked.ID,
+			Version: locked.Version,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if n != 1 {
+			return nil, apperr.Conflict("场次版本已变化，请刷新后重试")
+		}
+		sceneBefore := resource.SceneVO(locked)
+		change, err := deleteChange(resource.TypeScriptScene, locked.ID, projectID, nullInt32Value(locked.Version)+1, sceneBefore, markDeleted(sceneBefore, nullInt32Value(locked.Version)+1), []string{"deleted"})
+		if err != nil {
+			return nil, err
+		}
+		changes = append(changes, change)
+	}
+	for _, episode := range episodes {
+		locked, err := q.LockScriptEpisodeByID(ctx, episode.ID)
+		if err != nil {
+			return nil, err
+		}
+		n, err := q.SoftDeleteScriptEpisode(ctx, sqlcdb.SoftDeleteScriptEpisodeParams{
+			ID:      locked.ID,
+			Version: locked.Version,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if n != 1 {
+			return nil, apperr.Conflict("分集版本已变化，请刷新后重试")
+		}
+		episodeBefore := resource.EpisodeVO(locked)
+		change, err := deleteChange(resource.TypeScriptEpisode, locked.ID, projectID, nullInt32Value(locked.Version)+1, episodeBefore, markDeleted(episodeBefore, nullInt32Value(locked.Version)+1), []string{"deleted"})
+		if err != nil {
+			return nil, err
+		}
+		changes = append(changes, change)
+	}
+	return changes, nil
 }

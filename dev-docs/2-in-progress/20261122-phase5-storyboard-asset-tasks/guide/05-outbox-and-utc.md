@@ -23,7 +23,7 @@ SET next_attempt_at = TIMESTAMPADD(SECOND, LEAST(60, POW(2, LEAST(attempts + 1, 
 
 作业列上的时间全部用 `UTC_TIMESTAMP(6)` 写入和比较：`created_at`、`lease_until`、`next_poll_at`、`next_attempt_at`。迁移里这些列是 `datetime(6)`，没有 `DEFAULT CURRENT_TIMESTAMP`。集成测试把会话设成 `+08:00`，再比较 `UTC_TIMESTAMP()` 与 `CURRENT_TIMESTAMP()` 相差 8 小时，用来证明写入没有跟会话走。
 
-阶段5的图片/视频任务沿用同一规则，但列类型保持 Java 的 `datetime`（没有小数秒）。插入和更新写 `UTC_TIMESTAMP()`，不设会话默认值。分镜和资产是内容表，和剧本一样保留 `CURRENT_TIMESTAMP`，因为 Java 这些列就是会话时间，共用库时默认值要一致。
+阶段5的图片/视频任务沿用同一规则，但列类型保持 Java 的 `datetime`（没有小数秒）。插入和更新写 `UTC_TIMESTAMP()`，不设会话默认值。分镜和资产是内容表，和剧本一样保留 `CURRENT_TIMESTAMP`，因为 Java 这些列就是会话时间，共用库时默认值要一致。Go 进程在 `platform.WithUTCTimeZone` 里把没有显式 `time_zone` 的 DSN 补成 `+00:00`，这样 `loc=UTC` 标出的墙钟就是 UTC，而不是把会话本地时间误标成 UTC。集成测试仍把会话设成 `+08:00`，用来证明作业写入不跟会话走。
 
 ## 和 Java 的对应与差异
 
