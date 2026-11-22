@@ -40,7 +40,7 @@
 
 删除分镜集时，同一事务里先软删镜头，再软删场次，最后软删分集并写 `deleted_id`。删除场次时先软删镜头。删除主资产时先软删全部子资产。每一个被软删的子行都写一条 revision。删子资产时，若图片地址与主资产封面相同，封面被清空，主资产版本加一。剧本删除分集时同样为每个场次写 revision。
 
-没有 `DELETE /api/storyboard/{id}`。Java 不删除分镜文档本身；清空整棵树的 `clearContent` 还没做。
+没有 `DELETE /api/storyboard/{id}`。Java 不删除分镜文档本身。清空并保留父行的接口是 `POST /api/storyboard/{id}/clearContent` 和 `POST /api/storyboard/episode/{id}/clearContent`。
 
 ## 读接口
 
@@ -81,7 +81,7 @@ flowchart TD
 明确不做、避免和 Java 路径撞车的接口：
 
 - `POST /api/generation/image/submit` 与 video submit。那两个会写受理记录并调用供应商。本阶段的 `POST /api/generation/image` 只插入 `status = 0` 的任务行，返回完整对象而不是单独的 taskId 字符串。
-- `compose-video`、`clearContent`、`/children`、`/batch`、`/statistics`。
+- `compose-video`、`/children`、`/batch`、`/statistics`。`clearContent` 已实现，只清空子层。
 - `GET /api/asset/metadata/{assetType}`、`/all`、`/batch`。元数据是代码里的字段字典；`/all` 的分页协议和 `/list` 不同。
 
 图片和视频任务的删除与 Java 一样不走资源命令，因此不要求 `version` 或 `requestId`。前端 `deleteImage` / `deleteVideo` 只传数字 id。状态不是 2、3、4、6 时返回 409，文案分别是「请等待图片生成结束后再删除记录」和「请等待视频生成结束后再删除记录」。
@@ -89,7 +89,7 @@ flowchart TD
 ## 常见坑
 
 - 用数字主键调用 `GET /api/generation/image/{taskId}`。这条路径匹配的是公开 `taskId` 字符串。条目路径才是数字 id。
-- 调用 `DELETE /api/storyboard/{id}`。这个路由不存在；清空整棵分镜要等 `clearContent`。
+- 调用 `DELETE /api/storyboard/{id}`。这个路由不存在；清空整棵分镜走 `POST /api/storyboard/{id}/clearContent`。
 - 在任务仍是排队或处理中时删除它。会得到 409，而不是把条目一起删掉。
 - 在补丁里传 `sortOrder`。分镜树的排序只在创建时接受；子资产允许改 `sortOrder`。
 - 新建任务时自己传 `status: 2`。创建会拒绝，状态固定为排队中。补丁可以改 0 到 3，但这只改数据，不会启动 worker。

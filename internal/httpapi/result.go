@@ -17,7 +17,7 @@ type Result struct {
 }
 
 func WriteOK(w http.ResponseWriter, data any) {
-	write(w, http.StatusOK, Result{Code: 0, Msg: "ok", Data: data})
+	write(w, http.StatusOK, Result{Code: 0, Msg: "success", Data: data})
 }
 
 func WriteErr(w http.ResponseWriter, httpStatus int, code int, msg string) {

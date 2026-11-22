@@ -68,6 +68,8 @@ func run(logOut io.Writer) int {
 		handlers.ScriptSceneDelete{},
 		handlers.StoryboardCreate{},
 		handlers.StoryboardPatch{},
+		handlers.StoryboardClear{},
+		handlers.StoryboardEpisodeClear{},
 		handlers.StoryboardEpisodeCreate{},
 		handlers.StoryboardEpisodePatch{},
 		handlers.StoryboardEpisodeDelete{},
@@ -119,7 +121,14 @@ func run(logOut io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: handler}
+	server := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {

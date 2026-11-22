@@ -8,16 +8,31 @@ INSERT INTO afv_storyboard (
 );
 
 -- name: GetStoryboardByID :one
-SELECT * FROM afv_storyboard
+SELECT
+  id, project_id, script_id, title, description,
+  COALESCE(custom_columns, CAST('null' AS JSON)) AS custom_columns,
+  scope, owner_type, owner_id, total_duration, status, deleted,
+  create_time, update_time, version
+FROM afv_storyboard
 WHERE id = ? AND deleted = 0;
 
 -- name: LockStoryboardByID :one
-SELECT * FROM afv_storyboard
+SELECT
+  id, project_id, script_id, title, description,
+  COALESCE(custom_columns, CAST('null' AS JSON)) AS custom_columns,
+  scope, owner_type, owner_id, total_duration, status, deleted,
+  create_time, update_time, version
+FROM afv_storyboard
 WHERE id = ? AND deleted = 0
 FOR UPDATE;
 
 -- name: GetLatestStoryboardByProject :one
-SELECT * FROM afv_storyboard
+SELECT
+  id, project_id, script_id, title, description,
+  COALESCE(custom_columns, CAST('null' AS JSON)) AS custom_columns,
+  scope, owner_type, owner_id, total_duration, status, deleted,
+  create_time, update_time, version
+FROM afv_storyboard
 WHERE project_id = ? AND deleted = 0
 ORDER BY id DESC
 LIMIT 1;
@@ -123,13 +138,35 @@ ORDER BY id ASC
 FOR UPDATE;
 
 -- name: LockStoryboardItemsByScene :many
-SELECT * FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE storyboard_scene_id = ? AND deleted = 0
 ORDER BY id ASC
 FOR UPDATE;
 
 -- name: LockStoryboardItemsByEpisode :many
-SELECT * FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE deleted = 0
   AND (
     storyboard_episode_id = ?
@@ -197,23 +234,96 @@ INSERT INTO afv_storyboard_item (
 );
 
 -- name: GetStoryboardItemByID :one
-SELECT * FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE id = ? AND deleted = 0;
 
 -- name: LockStoryboardItemByID :one
-SELECT * FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE id = ? AND deleted = 0
 FOR UPDATE;
 
 -- name: ListStoryboardItemsByBoard :many
-SELECT * FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE storyboard_id = ? AND deleted = 0
 ORDER BY sort_order ASC, id ASC;
 
 -- name: ListStoryboardItemsByScene :many
-SELECT * FROM afv_storyboard_item
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
 WHERE storyboard_scene_id = ? AND deleted = 0
 ORDER BY sort_order ASC, id ASC;
+
+-- name: LockStoryboardEpisodesByBoard :many
+SELECT * FROM afv_storyboard_episode
+WHERE storyboard_id = ? AND IFNULL(deleted, 0) = 0
+ORDER BY id
+FOR UPDATE;
+
+-- name: LockStoryboardScenesByBoard :many
+SELECT * FROM afv_storyboard_scene
+WHERE storyboard_id = ? AND deleted = 0
+ORDER BY id
+FOR UPDATE;
+
+-- name: LockStoryboardItemsByBoard :many
+SELECT
+  id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order,
+  shot_number, auto_shot_number, image_url, reference_image_url, video_url,
+  generated_image_url, first_frame_image_url, last_frame_image_url,
+  first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration,
+  content, scene_expectation, sound, dialogue, sound_effect, music,
+  camera_movement, camera_angle, camera_equipment, focal_length, transition,
+  COALESCE(character_ids, CAST('null' AS JSON)) AS character_ids,
+  scene_asset_item_id, prop_ids, remark,
+  COALESCE(custom_data, CAST('null' AS JSON)) AS custom_data,
+  ai_generated, status, deleted, create_time, update_time, video_prompt, version
+FROM afv_storyboard_item
+WHERE storyboard_id = ? AND deleted = 0
+ORDER BY id
+FOR UPDATE;
 
 -- name: CountStoryboardItemsByScene :one
 SELECT COUNT(*) FROM afv_storyboard_item

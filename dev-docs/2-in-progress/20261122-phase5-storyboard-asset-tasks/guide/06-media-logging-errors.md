@@ -41,7 +41,7 @@ ffmpeg 可能跑几分钟。取消 HTTP 或租约失效时，进程必须被杀�
 
 请求 ID 只接受最长 128 的 ASCII。非法的请求头会被忽略并重新生成，避免把换行写进日志。logger 放在一个可替换的盒子里，后面的中间件可以追加字段，已经发出去的 context 仍看得到。
 
-业务错误是 `internal/apperr.Error`：HTTP 状态、业务 `code`、中文 `msg`。`WriteError` 用 `errors.As` 识别它。未识别的错误记一条带 `request_id` 的 Error 日志，对外只返回“服务器内部错误”。成功体是 `code = 0`，`msg` 目前仍是 `ok`。
+业务错误是 `internal/apperr.Error`：HTTP 状态、业务 `code`、中文 `msg`。`WriteError` 用 `errors.As` 识别它。未识别的错误记一条带 `request_id` 的 Error 日志，对外只返回“服务器内部错误”。成功体是 `code = 0`，`msg` 是 `success`，与 Java `CommonResult` 一致。
 
 领域代码返回 `apperr.BadRequest`、`Forbidden`、`NotFound`、`Conflict`，不在深层 `log.Fatal`，也不直接写 `http.ResponseWriter`。
 

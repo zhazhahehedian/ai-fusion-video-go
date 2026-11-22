@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
@@ -75,6 +76,46 @@ func (r *Repository) Claim(ctx context.Context, owner string) (*Job, error) {
 		return nil
 	})
 	return claimed, err
+}
+
+// ExecutionPermitted 对齐 Java GenerationExecutionIdentity.permitted 里本仓库能判断的部分。
+// 带 agentRunId 的任务需要仍在运行的 AgentRun。本仓库没有这张表，无法证明运行有效，因此停止。
+// 带 projectId 的任务必须仍是发起人拥有的个人项目。没有项目也没有智能体运行时允许继续。
+func (r *Repository) ExecutionPermitted(ctx context.Context, submissionID string) (bool, error) {
+	row, err := sqlcdb.New(r.db).GetGenerationSubmissionByID(ctx, submissionID)
+	if err != nil {
+		return false, err
+	}
+	if agentRunID(row.ContextJson) != "" {
+		return false, nil
+	}
+	if !row.ProjectID.Valid {
+		return true, nil
+	}
+	_, err = sqlcdb.New(r.db).GetOwnedProjectByID(ctx, sqlcdb.GetOwnedProjectByIDParams{
+		ID:      row.ProjectID.Int64,
+		OwnerID: row.ActorUserID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func agentRunID(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var body struct {
+		AgentRunID string `json:"agentRunId"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return "invalid"
+	}
+	return strings.TrimSpace(body.AgentRunID)
 }
 
 func (r *Repository) Heartbeat(ctx context.Context, claim Claim) error {

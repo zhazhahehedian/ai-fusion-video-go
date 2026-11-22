@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"sort"
 
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/apperr"
 	"github.com/zhazhahehedian/ai-fusion-video-go/internal/sqlcdb"
@@ -129,6 +130,15 @@ func asJSONBytes(v any) []byte {
 	}
 }
 
+func orderedChangedFields(fields []string) []string {
+	if fields == nil {
+		return []string{}
+	}
+	fields = append([]string(nil), fields...)
+	sort.Strings(fields)
+	return fields
+}
+
 func commit(ctx context.Context, q *sqlcdb.Queries, receipt Receipt, mutation Mutation) error {
 	updated, err := q.CommitResourceCommand(ctx, sqlcdb.CommitResourceCommandParams{
 		ResultJson: MustJSON(receipt),
@@ -142,10 +152,7 @@ func commit(ctx context.Context, q *sqlcdb.Queries, receipt Receipt, mutation Mu
 		return apperr.Conflict("业务命令重复提交")
 	}
 	for _, change := range mutation.Changes {
-		fields := change.ChangedFields
-		if fields == nil {
-			fields = []string{}
-		}
+		fields := orderedChangedFields(change.ChangedFields)
 		var projectID sql.NullInt64
 		if change.ProjectID != nil {
 			projectID = sql.NullInt64{Int64: *change.ProjectID, Valid: true}

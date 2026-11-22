@@ -149,7 +149,13 @@ func (q *Queries) CreateAssetItem(ctx context.Context, arg CreateAssetItemParams
 }
 
 const getAssetByID = `-- name: GetAssetByID :one
-SELECT id, user_id, project_id, type, name, description, cover_url, properties, tags, source_type, ai_prompt, owner_type, owner_id, status, deleted, create_time, update_time, version FROM afv_asset
+SELECT
+  id, user_id, project_id, type, name, description, cover_url,
+  COALESCE(properties, CAST('null' AS JSON)) AS properties,
+  COALESCE(tags, CAST('null' AS JSON)) AS tags,
+  source_type, ai_prompt, owner_type, owner_id, status, deleted,
+  create_time, update_time, version
+FROM afv_asset
 WHERE id = ? AND deleted = 0
 `
 
@@ -180,7 +186,11 @@ func (q *Queries) GetAssetByID(ctx context.Context, id int64) (AfvAsset, error) 
 }
 
 const getAssetItemByID = `-- name: GetAssetItemByID :one
-SELECT id, asset_id, item_type, name, image_url, thumbnail_url, properties, sort_order, source_type, ai_prompt, deleted, create_time, update_time, version FROM afv_asset_item
+SELECT
+  id, asset_id, item_type, name, image_url, thumbnail_url,
+  COALESCE(properties, CAST('null' AS JSON)) AS properties,
+  sort_order, source_type, ai_prompt, deleted, create_time, update_time, version
+FROM afv_asset_item
 WHERE id = ? AND deleted = 0
 `
 
@@ -207,7 +217,11 @@ func (q *Queries) GetAssetItemByID(ctx context.Context, id int64) (AfvAssetItem,
 }
 
 const listAssetItems = `-- name: ListAssetItems :many
-SELECT id, asset_id, item_type, name, image_url, thumbnail_url, properties, sort_order, source_type, ai_prompt, deleted, create_time, update_time, version FROM afv_asset_item
+SELECT
+  id, asset_id, item_type, name, image_url, thumbnail_url,
+  COALESCE(properties, CAST('null' AS JSON)) AS properties,
+  sort_order, source_type, ai_prompt, deleted, create_time, update_time, version
+FROM afv_asset_item
 WHERE asset_id = ? AND deleted = 0
 ORDER BY sort_order ASC, id ASC
 `
@@ -321,7 +335,13 @@ func (q *Queries) ListAssetsByOwner(ctx context.Context, arg ListAssetsByOwnerPa
 }
 
 const lockAssetByID = `-- name: LockAssetByID :one
-SELECT id, user_id, project_id, type, name, description, cover_url, properties, tags, source_type, ai_prompt, owner_type, owner_id, status, deleted, create_time, update_time, version FROM afv_asset
+SELECT
+  id, user_id, project_id, type, name, description, cover_url,
+  COALESCE(properties, CAST('null' AS JSON)) AS properties,
+  COALESCE(tags, CAST('null' AS JSON)) AS tags,
+  source_type, ai_prompt, owner_type, owner_id, status, deleted,
+  create_time, update_time, version
+FROM afv_asset
 WHERE id = ? AND deleted = 0
 FOR UPDATE
 `
@@ -353,7 +373,11 @@ func (q *Queries) LockAssetByID(ctx context.Context, id int64) (AfvAsset, error)
 }
 
 const lockAssetItemByID = `-- name: LockAssetItemByID :one
-SELECT id, asset_id, item_type, name, image_url, thumbnail_url, properties, sort_order, source_type, ai_prompt, deleted, create_time, update_time, version FROM afv_asset_item
+SELECT
+  id, asset_id, item_type, name, image_url, thumbnail_url,
+  COALESCE(properties, CAST('null' AS JSON)) AS properties,
+  sort_order, source_type, ai_prompt, deleted, create_time, update_time, version
+FROM afv_asset_item
 WHERE id = ? AND deleted = 0
 FOR UPDATE
 `
@@ -381,7 +405,11 @@ func (q *Queries) LockAssetItemByID(ctx context.Context, id int64) (AfvAssetItem
 }
 
 const lockAssetItemsByAsset = `-- name: LockAssetItemsByAsset :many
-SELECT id, asset_id, item_type, name, image_url, thumbnail_url, properties, sort_order, source_type, ai_prompt, deleted, create_time, update_time, version FROM afv_asset_item
+SELECT
+  id, asset_id, item_type, name, image_url, thumbnail_url,
+  COALESCE(properties, CAST('null' AS JSON)) AS properties,
+  sort_order, source_type, ai_prompt, deleted, create_time, update_time, version
+FROM afv_asset_item
 WHERE asset_id = ? AND deleted = 0
 ORDER BY id ASC
 FOR UPDATE

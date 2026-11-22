@@ -6,19 +6,24 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"sync"
 	"time"
 )
 
+const defaultMaxOutputBytes = 1 << 20
+
 // ProcessRunner 对齐 Java MediaProcessRunner：跑外部命令，期间可心跳/鉴租约，取消即杀进程。
 type ProcessRunner struct {
-	TickEvery time.Duration
-	Timeout   time.Duration
+	TickEvery      time.Duration
+	Timeout        time.Duration
+	MaxOutputBytes int
 }
 
 func NewProcessRunner() *ProcessRunner {
 	return &ProcessRunner{
-		TickEvery: time.Second,
-		Timeout:   30 * time.Minute,
+		TickEvery:      time.Second,
+		Timeout:        30 * time.Minute,
+		MaxOutputBytes: defaultMaxOutputBytes,
 	}
 }
 
@@ -35,9 +40,9 @@ func (r *ProcessRunner) Run(ctx context.Context, argv []string, workDir string, 
 
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = workDir
-	var output bytes.Buffer
-	cmd.Stdout = &output
-	cmd.Stderr = &output
+	output := newCappedBuffer(r.MaxOutputBytes)
+	cmd.Stdout = output
+	cmd.Stderr = output
 
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("无法启动进程 %q: %w", argv[0], err)
@@ -53,13 +58,17 @@ func (r *ProcessRunner) Run(ctx context.Context, argv []string, workDir string, 
 	ticker := time.NewTicker(tickEvery)
 	defer ticker.Stop()
 
-	killWait := func() {
+	// killWait 必须等 Wait 返回后再读输出。超时后 Wait 仍可能往缓冲区写，
+	// 缓冲区自己加锁，这里返回“进程仍未退出”，不再和 Wait 抢同一块裸 buffer。
+	killWait := func() error {
 		if cmd.Process != nil {
 			_ = cmd.Process.Kill()
 		}
 		select {
-		case <-done:
+		case err := <-done:
+			return err
 		case <-time.After(5 * time.Second):
+			return errProcessLinger
 		}
 	}
 
@@ -79,14 +88,55 @@ func (r *ProcessRunner) Run(ctx context.Context, argv []string, workDir string, 
 				continue
 			}
 			if err := onTick(); err != nil {
-				killWait()
+				waitErr := killWait()
+				if errors.Is(waitErr, errProcessLinger) {
+					return "", fmt.Errorf("%w: %w", err, errProcessLinger)
+				}
 				return output.String(), err
 			}
 		case <-ctx.Done():
-			killWait()
+			waitErr := killWait()
+			if errors.Is(waitErr, errProcessLinger) {
+				return "", fmt.Errorf("%w: %w", ctx.Err(), errProcessLinger)
+			}
 			return output.String(), ctx.Err()
 		}
 	}
+}
+
+var errProcessLinger = errors.New("进程在终止后仍未退出")
+
+type cappedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+	max int
+}
+
+func newCappedBuffer(max int) *cappedBuffer {
+	if max <= 0 {
+		max = defaultMaxOutputBytes
+	}
+	return &cappedBuffer{max: max}
+}
+
+func (c *cappedBuffer) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	remain := c.max - c.buf.Len()
+	if remain > 0 {
+		if len(p) > remain {
+			_, _ = c.buf.Write(p[:remain])
+		} else {
+			_, _ = c.buf.Write(p)
+		}
+	}
+	return len(p), nil
+}
+
+func (c *cappedBuffer) String() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.String()
 }
 
 func trimOut(s string) string {

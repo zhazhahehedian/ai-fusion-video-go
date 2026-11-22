@@ -45,7 +45,7 @@
 
 ## 开发文档
 
-- `dev-docs/` 顶层只保留 `1-todo/`、`2-in-progress/`、`3-completed/`，禁止散放未分类文档。
+- `dev-docs/` 顶层只保留 `1-todo/`、`2-in-progress/`、`3-completed/`，以及长期维护的 `guide/`（`tech/` 与 `business/`，各有索引）。禁止散放其他未分类文档。
 - 待办存入 `1-todo/`，文件名为 `YYYY-MM-DD-待办事项.md`。
 - 进行中需求存入 `2-in-progress/YYYYMMDD-需求名/`；每个目录固定包含 `development-plan.md`、`progress-tracking.md`、`technical-debt.md`。
 - 需求完成后将整个需求目录移入 `3-completed/`，并补充高信息密度的 `completion-summary.md`。

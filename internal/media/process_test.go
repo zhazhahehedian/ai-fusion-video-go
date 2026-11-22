@@ -36,6 +36,19 @@ func TestProcessRunnerCancelKillsProcess(t *testing.T) {
 	}
 }
 
+func TestProcessRunnerCapsOutput(t *testing.T) {
+	runner := NewProcessRunner()
+	runner.MaxOutputBytes = 32
+	runner.Timeout = 5 * time.Second
+	out, err := runner.Run(context.Background(), []string{"dd", "if=/dev/zero", "bs=200", "count=1"}, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) > runner.MaxOutputBytes {
+		t.Fatalf("output len %d exceeds cap %d", len(out), runner.MaxOutputBytes)
+	}
+}
+
 func TestProcessRunnerOnTickStopsProcess(t *testing.T) {
 	runner := NewProcessRunner()
 	runner.TickEvery = 50 * time.Millisecond

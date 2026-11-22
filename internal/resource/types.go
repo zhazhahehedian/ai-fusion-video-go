@@ -33,6 +33,7 @@ const (
 	OpPatch               Operation = "PATCH"
 	OpDelete              Operation = "DELETE"
 	OpReplaceScriptSource Operation = "REPLACE_SCRIPT_SOURCE"
+	OpClearContent        Operation = "CLEAR_CONTENT"
 )
 
 type Origin string
@@ -103,6 +104,18 @@ type SourceCommand struct {
 func (c SourceCommand) RequestID() string    { return c.ReqID }
 func (c SourceCommand) ResourceType() Type   { return TypeScript }
 func (c SourceCommand) Operation() Operation { return OpReplaceScriptSource }
+
+// ClearCommand 清空分镜或分镜集的子层，保留父行。对齐 Java CLEAR。
+type ClearCommand struct {
+	ReqID   string
+	ResType Type
+	ID      int64
+	Version int32
+}
+
+func (c ClearCommand) RequestID() string    { return c.ReqID }
+func (c ClearCommand) ResourceType() Type   { return c.ResType }
+func (c ClearCommand) Operation() Operation { return OpClearContent }
 
 type Change struct {
 	EventID       string   `json:"eventId"`

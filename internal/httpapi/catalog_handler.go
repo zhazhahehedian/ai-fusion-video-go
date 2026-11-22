@@ -469,6 +469,46 @@ func (d Deps) readID(w http.ResponseWriter, r *http.Request, name string, load f
 	WriteOK(w, vo)
 }
 
+func (d Deps) handleStoryboardClear(w http.ResponseWriter, r *http.Request) {
+	d.handleClearContent(w, r, resource.TypeStoryboard)
+}
+
+func (d Deps) handleStoryboardEpisodeClear(w http.ResponseWriter, r *http.Request) {
+	d.handleClearContent(w, r, resource.TypeStoryboardEpisode)
+}
+
+func (d Deps) handleClearContent(w http.ResponseWriter, r *http.Request, resType resource.Type) {
+	session, ok := auth.SessionFrom(r.Context())
+	if !ok {
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
+		return
+	}
+	id, err := pathID(r, "id")
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
+	var req struct {
+		RequestID string `json:"requestId"`
+		Version   int32  `json:"version"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, r, apperr.BadRequest("请求体无效"))
+		return
+	}
+	receipt, err := d.Commands.Execute(r.Context(), resource.ClearCommand{
+		ReqID:   req.RequestID,
+		ResType: resType,
+		ID:      id,
+		Version: req.Version,
+	}, resource.Context{ActorUserID: session.UserID})
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
+	WriteOK(w, receipt.Result)
+}
+
 func pathID(r *http.Request, name string) (int64, error) {
 	id, err := strconv.ParseInt(chi.URLParam(r, name), 10, 64)
 	if err != nil || id <= 0 {
