@@ -178,12 +178,29 @@ func (AssetDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.Co
 	if row.Version != del.Version {
 		return resource.Mutation{}, apperr.Conflict("资产版本已变化，请刷新后重试")
 	}
-	items, err := q.CountAssetItems(ctx, row.ID)
+	projectID, err := assetProject(row)
 	if err != nil {
 		return resource.Mutation{}, err
 	}
-	if items > 0 {
-		return resource.Mutation{}, apperr.Conflict("请先删除资产下的子资产")
+	items, err := q.LockAssetItemsByAsset(ctx, row.ID)
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	changes := make([]resource.Change, 0, len(items)+1)
+	for _, item := range items {
+		n, err := q.SoftDeleteAssetItem(ctx, sqlcdb.SoftDeleteAssetItemParams{ID: item.ID, Version: item.Version})
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		if err := oneRow(n, "子资产版本已变化，请刷新后重试"); err != nil {
+			return resource.Mutation{}, err
+		}
+		itemBefore := resource.AssetItemVO(item)
+		change, err := deleteChange(resource.TypeAssetItem, item.ID, projectID, item.Version+1, itemBefore, markDeleted(itemBefore, item.Version+1), []string{"deleted"})
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		changes = append(changes, change)
 	}
 	n, err := q.SoftDeleteAsset(ctx, sqlcdb.SoftDeleteAssetParams{ID: row.ID, Version: row.Version})
 	if err != nil {
@@ -192,12 +209,13 @@ func (AssetDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.Co
 	if err := oneRow(n, "资产版本已变化，请刷新后重试"); err != nil {
 		return resource.Mutation{}, err
 	}
-	projectID, err := assetProject(row)
+	before := resource.AssetVO(row)
+	change, err := deleteChange(resource.TypeAsset, row.ID, projectID, row.Version+1, before, markDeleted(before, row.Version+1), []string{"deleted"})
 	if err != nil {
 		return resource.Mutation{}, err
 	}
-	before := resource.AssetVO(row)
-	return deleted(resource.TypeAsset, row.ID, projectID, row.Version+1, before, markDeleted(before, row.Version+1))
+	changes = append(changes, change)
+	return resource.Mutation{Result: true, Changes: changes, PreviousValues: before}, nil
 }
 
 type AssetItemCreate struct{}
@@ -442,17 +460,45 @@ func (AssetItemDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resourc
 	if err := oneRow(n, "子资产版本已变化，请刷新后重试"); err != nil {
 		return resource.Mutation{}, err
 	}
-	bumped, err := q.BumpAssetVersion(ctx, sqlcdb.BumpAssetVersionParams{ID: asset.ID, Version: asset.Version})
-	if err != nil {
-		return resource.Mutation{}, err
-	}
-	if err := oneRow(bumped, "资产版本已变化，请刷新后重试"); err != nil {
-		return resource.Mutation{}, err
-	}
 	projectID, err := assetProject(asset)
 	if err != nil {
 		return resource.Mutation{}, err
 	}
+	assetBefore := resource.AssetVO(asset)
+	assetAfter := cloneMap(assetBefore)
+	assetAfter["version"] = asset.Version + 1
+	changed := []string{"items"}
+	if coverMatches(row.ImageUrl, asset.CoverUrl) {
+		cleared, err := q.ClearAssetCover(ctx, sqlcdb.ClearAssetCoverParams{ID: asset.ID, Version: asset.Version})
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		if err := oneRow(cleared, "资产版本已变化，请刷新后重试"); err != nil {
+			return resource.Mutation{}, err
+		}
+		assetAfter["coverUrl"] = nil
+		changed = []string{"coverUrl"}
+	} else {
+		bumped, err := q.BumpAssetVersion(ctx, sqlcdb.BumpAssetVersionParams{ID: asset.ID, Version: asset.Version})
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		if err := oneRow(bumped, "资产版本已变化，请刷新后重试"); err != nil {
+			return resource.Mutation{}, err
+		}
+	}
+	parentChange, err := assetChange(asset.ID, projectID, asset.Version+1, changed, assetBefore, assetAfter)
+	if err != nil {
+		return resource.Mutation{}, err
+	}
 	before := resource.AssetItemVO(row)
-	return deleted(resource.TypeAssetItem, row.ID, projectID, row.Version+1, before, markDeleted(before, row.Version+1))
+	itemChange, err := deleteChange(resource.TypeAssetItem, row.ID, projectID, row.Version+1, before, markDeleted(before, row.Version+1), []string{"deleted"})
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	return resource.Mutation{
+		Result:         true,
+		Changes:        []resource.Change{itemChange, parentChange},
+		PreviousValues: before,
+	}, nil
 }

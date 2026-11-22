@@ -902,6 +902,162 @@ func (q *Queries) LockStoryboardItemByID(ctx context.Context, id int64) (AfvStor
 	return i, err
 }
 
+const lockStoryboardItemsByEpisode = `-- name: LockStoryboardItemsByEpisode :many
+SELECT id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order, shot_number, auto_shot_number, image_url, reference_image_url, video_url, generated_image_url, first_frame_image_url, last_frame_image_url, first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration, content, scene_expectation, sound, dialogue, sound_effect, music, camera_movement, camera_angle, camera_equipment, focal_length, transition, character_ids, scene_asset_item_id, prop_ids, remark, custom_data, ai_generated, status, deleted, create_time, update_time, video_prompt, version FROM afv_storyboard_item
+WHERE deleted = 0
+  AND (
+    storyboard_episode_id = ?
+    OR storyboard_scene_id IN (
+      SELECT id FROM afv_storyboard_scene
+      WHERE episode_id = ? AND IFNULL(deleted, 0) = 0
+    )
+  )
+ORDER BY id ASC
+FOR UPDATE
+`
+
+type LockStoryboardItemsByEpisodeParams struct {
+	StoryboardEpisodeID sql.NullInt64 `json:"storyboard_episode_id"`
+	EpisodeID           int64         `json:"episode_id"`
+}
+
+func (q *Queries) LockStoryboardItemsByEpisode(ctx context.Context, arg LockStoryboardItemsByEpisodeParams) ([]AfvStoryboardItem, error) {
+	rows, err := q.db.QueryContext(ctx, lockStoryboardItemsByEpisode, arg.StoryboardEpisodeID, arg.EpisodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AfvStoryboardItem{}
+	for rows.Next() {
+		var i AfvStoryboardItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoryboardID,
+			&i.StoryboardEpisodeID,
+			&i.StoryboardSceneID,
+			&i.SortOrder,
+			&i.ShotNumber,
+			&i.AutoShotNumber,
+			&i.ImageUrl,
+			&i.ReferenceImageUrl,
+			&i.VideoUrl,
+			&i.GeneratedImageUrl,
+			&i.FirstFrameImageUrl,
+			&i.LastFrameImageUrl,
+			&i.FirstFramePrompt,
+			&i.LastFramePrompt,
+			&i.GeneratedVideoUrl,
+			&i.ShotType,
+			&i.Duration,
+			&i.Content,
+			&i.SceneExpectation,
+			&i.Sound,
+			&i.Dialogue,
+			&i.SoundEffect,
+			&i.Music,
+			&i.CameraMovement,
+			&i.CameraAngle,
+			&i.CameraEquipment,
+			&i.FocalLength,
+			&i.Transition,
+			&i.CharacterIds,
+			&i.SceneAssetItemID,
+			&i.PropIds,
+			&i.Remark,
+			&i.CustomData,
+			&i.AiGenerated,
+			&i.Status,
+			&i.Deleted,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.VideoPrompt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockStoryboardItemsByScene = `-- name: LockStoryboardItemsByScene :many
+SELECT id, storyboard_id, storyboard_episode_id, storyboard_scene_id, sort_order, shot_number, auto_shot_number, image_url, reference_image_url, video_url, generated_image_url, first_frame_image_url, last_frame_image_url, first_frame_prompt, last_frame_prompt, generated_video_url, shot_type, duration, content, scene_expectation, sound, dialogue, sound_effect, music, camera_movement, camera_angle, camera_equipment, focal_length, transition, character_ids, scene_asset_item_id, prop_ids, remark, custom_data, ai_generated, status, deleted, create_time, update_time, video_prompt, version FROM afv_storyboard_item
+WHERE storyboard_scene_id = ? AND deleted = 0
+ORDER BY id ASC
+FOR UPDATE
+`
+
+func (q *Queries) LockStoryboardItemsByScene(ctx context.Context, storyboardSceneID sql.NullInt64) ([]AfvStoryboardItem, error) {
+	rows, err := q.db.QueryContext(ctx, lockStoryboardItemsByScene, storyboardSceneID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AfvStoryboardItem{}
+	for rows.Next() {
+		var i AfvStoryboardItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoryboardID,
+			&i.StoryboardEpisodeID,
+			&i.StoryboardSceneID,
+			&i.SortOrder,
+			&i.ShotNumber,
+			&i.AutoShotNumber,
+			&i.ImageUrl,
+			&i.ReferenceImageUrl,
+			&i.VideoUrl,
+			&i.GeneratedImageUrl,
+			&i.FirstFrameImageUrl,
+			&i.LastFrameImageUrl,
+			&i.FirstFramePrompt,
+			&i.LastFramePrompt,
+			&i.GeneratedVideoUrl,
+			&i.ShotType,
+			&i.Duration,
+			&i.Content,
+			&i.SceneExpectation,
+			&i.Sound,
+			&i.Dialogue,
+			&i.SoundEffect,
+			&i.Music,
+			&i.CameraMovement,
+			&i.CameraAngle,
+			&i.CameraEquipment,
+			&i.FocalLength,
+			&i.Transition,
+			&i.CharacterIds,
+			&i.SceneAssetItemID,
+			&i.PropIds,
+			&i.Remark,
+			&i.CustomData,
+			&i.AiGenerated,
+			&i.Status,
+			&i.Deleted,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.VideoPrompt,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockStoryboardSceneByID = `-- name: LockStoryboardSceneByID :one
 SELECT id, episode_id, storyboard_id, scene_number, scene_heading, location, time_of_day, int_ext, sort_order, status, deleted, create_time, update_time, version FROM afv_storyboard_scene
 WHERE id = ? AND IFNULL(deleted, 0) = 0
@@ -928,6 +1084,51 @@ func (q *Queries) LockStoryboardSceneByID(ctx context.Context, id int64) (AfvSto
 		&i.Version,
 	)
 	return i, err
+}
+
+const lockStoryboardScenesByEpisode = `-- name: LockStoryboardScenesByEpisode :many
+SELECT id, episode_id, storyboard_id, scene_number, scene_heading, location, time_of_day, int_ext, sort_order, status, deleted, create_time, update_time, version FROM afv_storyboard_scene
+WHERE episode_id = ? AND IFNULL(deleted, 0) = 0
+ORDER BY id ASC
+FOR UPDATE
+`
+
+func (q *Queries) LockStoryboardScenesByEpisode(ctx context.Context, episodeID int64) ([]AfvStoryboardScene, error) {
+	rows, err := q.db.QueryContext(ctx, lockStoryboardScenesByEpisode, episodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AfvStoryboardScene{}
+	for rows.Next() {
+		var i AfvStoryboardScene
+		if err := rows.Scan(
+			&i.ID,
+			&i.EpisodeID,
+			&i.StoryboardID,
+			&i.SceneNumber,
+			&i.SceneHeading,
+			&i.Location,
+			&i.TimeOfDay,
+			&i.IntExt,
+			&i.SortOrder,
+			&i.Status,
+			&i.Deleted,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const softDeleteStoryboard = `-- name: SoftDeleteStoryboard :execrows

@@ -75,6 +75,18 @@ SELECT * FROM afv_asset_item
 WHERE asset_id = ? AND deleted = 0
 ORDER BY sort_order ASC, id ASC;
 
+-- name: LockAssetItemsByAsset :many
+SELECT * FROM afv_asset_item
+WHERE asset_id = ? AND deleted = 0
+ORDER BY id ASC
+FOR UPDATE;
+
+-- name: ClearAssetCover :execrows
+UPDATE afv_asset
+SET cover_url = NULL,
+    version = version + 1
+WHERE id = ? AND version = ? AND deleted = 0;
+
 -- name: CountAssetItems :one
 SELECT COUNT(*) FROM afv_asset_item
 WHERE asset_id = ? AND deleted = 0;

@@ -245,12 +245,35 @@ func (StoryboardEpisodeDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd
 	if row.Version != del.Version {
 		return resource.Mutation{}, apperr.Conflict("分镜集版本已变化，请刷新后重试")
 	}
-	scenes, err := q.CountStoryboardScenesByEpisode(ctx, row.ID)
+	projectID, err := boardProject(board)
 	if err != nil {
 		return resource.Mutation{}, err
 	}
-	if scenes > 0 {
-		return resource.Mutation{}, apperr.Conflict("请先删除分集下的场次")
+	scenes, err := q.LockStoryboardScenesByEpisode(ctx, row.ID)
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	shots, err := q.LockStoryboardItemsByEpisode(ctx, sqlcdb.LockStoryboardItemsByEpisodeParams{
+		StoryboardEpisodeID: sql.NullInt64{Int64: row.ID, Valid: true},
+		EpisodeID:           row.ID,
+	})
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	changes := make([]resource.Change, 0, len(shots)+len(scenes)+1)
+	for _, shot := range shots {
+		change, err := softDeleteShot(ctx, q, shot, projectID)
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		changes = append(changes, change)
+	}
+	for _, scene := range scenes {
+		change, err := softDeleteStoryboardScene(ctx, q, scene, projectID)
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		changes = append(changes, change)
 	}
 	n, err := q.SoftDeleteStoryboardEpisode(ctx, sqlcdb.SoftDeleteStoryboardEpisodeParams{ID: row.ID, Version: row.Version})
 	if err != nil {
@@ -268,12 +291,13 @@ func (StoryboardEpisodeDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd
 	if err := oneRow(bumped, "分镜版本已变化，请刷新后重试"); err != nil {
 		return resource.Mutation{}, err
 	}
-	projectID, err := boardProject(board)
-	if err != nil {
-		return resource.Mutation{}, err
-	}
 	before := resource.StoryboardEpisodeVO(row)
 	after := markDeleted(before, row.Version+1)
 	after["deletedId"] = row.ID
-	return deleted(resource.TypeStoryboardEpisode, row.ID, projectID, row.Version+1, before, after)
+	change, err := deleteChange(resource.TypeStoryboardEpisode, row.ID, projectID, row.Version+1, before, after, []string{"deleted"})
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	changes = append(changes, change)
+	return resource.Mutation{Result: true, Changes: changes, PreviousValues: before}, nil
 }

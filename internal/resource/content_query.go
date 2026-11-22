@@ -333,6 +333,83 @@ func (s *ContentQuery) VideoTaskPage(ctx context.Context, actorUserID int64, pag
 	})
 }
 
+func (s *ContentQuery) DeleteImageTask(ctx context.Context, actorUserID, id int64) error {
+	return s.deleteGenerationTask(ctx, actorUserID, id, true)
+}
+
+func (s *ContentQuery) DeleteVideoTask(ctx context.Context, actorUserID, id int64) error {
+	return s.deleteGenerationTask(ctx, actorUserID, id, false)
+}
+
+func (s *ContentQuery) deleteGenerationTask(ctx context.Context, actorUserID, id int64, image bool) error {
+	return withTx(ctx, s.db, func(tx *sql.Tx) error {
+		q := sqlcdb.New(tx)
+		if image {
+			row, err := q.LockImageTaskByID(ctx, id)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					return apperr.NotFound("图片任务不存在")
+				}
+				return err
+			}
+			if row.UserID != actorUserID {
+				return apperr.Forbidden("无权访问该任务")
+			}
+			if !DeletableTaskStatus(row.Status) {
+				return apperr.Conflict("请等待图片生成结束后再删除记录")
+			}
+			if err := q.SoftDeleteImageItemsByTask(ctx, row.ID); err != nil {
+				return err
+			}
+			n, err := q.SoftDeleteImageTask(ctx, row.ID)
+			if err != nil {
+				return err
+			}
+			if n != 1 {
+				return apperr.NotFound("图片任务不存在")
+			}
+			return nil
+		}
+		row, err := q.LockVideoTaskByID(ctx, id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return apperr.NotFound("视频任务不存在")
+			}
+			return err
+		}
+		if row.UserID != actorUserID {
+			return apperr.Forbidden("无权访问该任务")
+		}
+		if !DeletableTaskStatus(row.Status) {
+			return apperr.Conflict("请等待视频生成结束后再删除记录")
+		}
+		if err := q.SoftDeleteVideoItemsByTask(ctx, row.ID); err != nil {
+			return err
+		}
+		n, err := q.SoftDeleteVideoTask(ctx, row.ID)
+		if err != nil {
+			return err
+		}
+		if n != 1 {
+			return apperr.NotFound("视频任务不存在")
+		}
+		return nil
+	})
+}
+
+// DeletableTaskStatus 对齐 Java：只有已结束的生成记录可以删除。
+func DeletableTaskStatus(status sql.NullInt32) bool {
+	if !status.Valid {
+		return false
+	}
+	switch status.Int32 {
+	case 2, 3, 4, 6:
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *ContentQuery) VideoItems(ctx context.Context, actorUserID, taskID int64) ([]map[string]any, error) {
 	q := sqlcdb.New(s.db)
 	task, err := q.GetVideoTaskByID(ctx, taskID)

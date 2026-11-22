@@ -30,6 +30,26 @@ func (q *Queries) BumpAssetVersion(ctx context.Context, arg BumpAssetVersionPara
 	return result.RowsAffected()
 }
 
+const clearAssetCover = `-- name: ClearAssetCover :execrows
+UPDATE afv_asset
+SET cover_url = NULL,
+    version = version + 1
+WHERE id = ? AND version = ? AND deleted = 0
+`
+
+type ClearAssetCoverParams struct {
+	ID      int64 `json:"id"`
+	Version int32 `json:"version"`
+}
+
+func (q *Queries) ClearAssetCover(ctx context.Context, arg ClearAssetCoverParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, clearAssetCover, arg.ID, arg.Version)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const countAssetItems = `-- name: CountAssetItems :one
 SELECT COUNT(*) FROM afv_asset_item
 WHERE asset_id = ? AND deleted = 0
@@ -358,6 +378,51 @@ func (q *Queries) LockAssetItemByID(ctx context.Context, id int64) (AfvAssetItem
 		&i.Version,
 	)
 	return i, err
+}
+
+const lockAssetItemsByAsset = `-- name: LockAssetItemsByAsset :many
+SELECT id, asset_id, item_type, name, image_url, thumbnail_url, properties, sort_order, source_type, ai_prompt, deleted, create_time, update_time, version FROM afv_asset_item
+WHERE asset_id = ? AND deleted = 0
+ORDER BY id ASC
+FOR UPDATE
+`
+
+func (q *Queries) LockAssetItemsByAsset(ctx context.Context, assetID int64) ([]AfvAssetItem, error) {
+	rows, err := q.db.QueryContext(ctx, lockAssetItemsByAsset, assetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AfvAssetItem{}
+	for rows.Next() {
+		var i AfvAssetItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.AssetID,
+			&i.ItemType,
+			&i.Name,
+			&i.ImageUrl,
+			&i.ThumbnailUrl,
+			&i.Properties,
+			&i.SortOrder,
+			&i.SourceType,
+			&i.AiPrompt,
+			&i.Deleted,
+			&i.CreateTime,
+			&i.UpdateTime,
+			&i.Version,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const softDeleteAsset = `-- name: SoftDeleteAsset :execrows

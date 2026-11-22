@@ -235,12 +235,25 @@ func (StoryboardSceneDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd r
 	if row.Version != del.Version {
 		return resource.Mutation{}, apperr.Conflict("分镜场次版本已变化，请刷新后重试")
 	}
-	items, err := q.CountStoryboardItemsByScene(ctx, sql.NullInt64{Int64: row.ID, Valid: true})
+	board, err := q.GetStoryboardByID(ctx, row.StoryboardID)
 	if err != nil {
 		return resource.Mutation{}, err
 	}
-	if items > 0 {
-		return resource.Mutation{}, apperr.Conflict("请先删除场次下的镜头")
+	projectID, err := boardProject(board)
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	shots, err := q.LockStoryboardItemsByScene(ctx, sql.NullInt64{Int64: row.ID, Valid: true})
+	if err != nil {
+		return resource.Mutation{}, err
+	}
+	changes := make([]resource.Change, 0, len(shots)+1)
+	for _, shot := range shots {
+		change, err := softDeleteShot(ctx, q, shot, projectID)
+		if err != nil {
+			return resource.Mutation{}, err
+		}
+		changes = append(changes, change)
 	}
 	n, err := q.SoftDeleteStoryboardScene(ctx, sqlcdb.SoftDeleteStoryboardSceneParams{ID: row.ID, Version: row.Version})
 	if err != nil {
@@ -256,14 +269,35 @@ func (StoryboardSceneDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd r
 	if err := oneRow(bumped, "分镜集版本已变化，请刷新后重试"); err != nil {
 		return resource.Mutation{}, err
 	}
-	board, err := q.GetStoryboardByID(ctx, row.StoryboardID)
+	before := resource.StoryboardSceneVO(row)
+	change, err := deleteChange(resource.TypeStoryboardScene, row.ID, projectID, row.Version+1, before, markDeleted(before, row.Version+1), []string{"deleted"})
 	if err != nil {
 		return resource.Mutation{}, err
 	}
-	projectID, err := boardProject(board)
+	changes = append(changes, change)
+	return resource.Mutation{Result: true, Changes: changes, PreviousValues: before}, nil
+}
+
+func softDeleteShot(ctx context.Context, q *sqlcdb.Queries, row sqlcdb.AfvStoryboardItem, projectID int64) (resource.Change, error) {
+	n, err := q.SoftDeleteStoryboardItem(ctx, sqlcdb.SoftDeleteStoryboardItemParams{ID: row.ID, Version: row.Version})
 	if err != nil {
-		return resource.Mutation{}, err
+		return resource.Change{}, err
+	}
+	if err := oneRow(n, "镜头版本已变化，请刷新后重试"); err != nil {
+		return resource.Change{}, err
+	}
+	before := resource.StoryboardItemVO(row)
+	return deleteChange(resource.TypeShot, row.ID, projectID, row.Version+1, before, markDeleted(before, row.Version+1), []string{"deleted"})
+}
+
+func softDeleteStoryboardScene(ctx context.Context, q *sqlcdb.Queries, row sqlcdb.AfvStoryboardScene, projectID int64) (resource.Change, error) {
+	n, err := q.SoftDeleteStoryboardScene(ctx, sqlcdb.SoftDeleteStoryboardSceneParams{ID: row.ID, Version: row.Version})
+	if err != nil {
+		return resource.Change{}, err
+	}
+	if err := oneRow(n, "分镜场次版本已变化，请刷新后重试"); err != nil {
+		return resource.Change{}, err
 	}
 	before := resource.StoryboardSceneVO(row)
-	return deleted(resource.TypeStoryboardScene, row.ID, projectID, row.Version+1, before, markDeleted(before, row.Version+1))
+	return deleteChange(resource.TypeStoryboardScene, row.ID, projectID, row.Version+1, before, markDeleted(before, row.Version+1), []string{"deleted"})
 }

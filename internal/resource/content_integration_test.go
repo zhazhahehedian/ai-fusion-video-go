@@ -37,11 +37,13 @@ func TestContentCommandPipeline(t *testing.T) {
 		handlers.StoryboardEpisodeCreate{},
 		handlers.StoryboardEpisodePatch{},
 		handlers.StoryboardEpisodeDelete{},
+		handlers.StoryboardSceneCreate{},
+		handlers.StoryboardItemCreate{},
 		handlers.AssetCreate{},
+		handlers.AssetDelete{},
 		handlers.AssetItemCreate{},
 		handlers.ImageTaskCreate{},
 		handlers.ImageTaskPatch{},
-		handlers.ImageTaskDelete{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -120,13 +122,53 @@ func TestContentCommandPipeline(t *testing.T) {
 	if again.CommandID != renamed.CommandID {
 		t.Fatalf("replay command %s != %s", again.CommandID, renamed.CommandID)
 	}
-	if _, err := svc.Execute(ctx, resource.DeleteCommand{
+	scene, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID:   "scene-1",
+		ResType: resource.TypeStoryboardScene,
+		Fields: map[string]any{
+			"episodeId":     episodeID,
+			"parentVersion": float64(1),
+			"sceneHeading":  "内景",
+		},
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sceneID := resultID(t, scene.Result)
+	item, err := svc.Execute(ctx, resource.CreateCommand{
+		ReqID:   "shot-1",
+		ResType: resource.TypeShot,
+		Fields: map[string]any{
+			"storyboardSceneId": sceneID,
+			"parentVersion":     float64(0),
+			"content":           "雨",
+		},
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	shotID := resultID(t, item.Result)
+	deletedEpisode, err := svc.Execute(ctx, resource.DeleteCommand{
 		ReqID:   "ep-del",
 		ResType: resource.TypeStoryboardEpisode,
 		ID:      episodeID,
-		Version: 1,
-	}, resource.Context{ActorUserID: actor}); err != nil {
+		Version: 2,
+	}, resource.Context{ActorUserID: actor})
+	if err != nil {
 		t.Fatal(err)
+	}
+	var childRevisions int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM afv_resource_revision WHERE command_id = ? AND resource_type IN ('shot', 'storyboardScene')`, deletedEpisode.CommandID).Scan(&childRevisions); err != nil {
+		t.Fatal(err)
+	}
+	if childRevisions != 2 {
+		t.Fatalf("episode delete should revise the shot and the scene, got %d", childRevisions)
+	}
+	if _, err := reads.StoryboardScene(ctx, actor, sceneID); !isNotFound(err) {
+		t.Fatalf("scene should be cascade-deleted, got %v", err)
+	}
+	if _, err := reads.StoryboardItem(ctx, actor, shotID); !isNotFound(err) {
+		t.Fatalf("shot should be cascade-deleted, got %v", err)
 	}
 	if _, err := reads.StoryboardEpisode(ctx, actor, episodeID); !isNotFound(err) {
 		t.Fatalf("deleted episode must be hidden, got %v", err)
@@ -160,6 +202,17 @@ func TestContentCommandPipeline(t *testing.T) {
 	items, err := reads.AssetItems(ctx, actor, assetID)
 	if err != nil || len(items) != 1 {
 		t.Fatalf("items %v err %v", items, err)
+	}
+	if _, err := svc.Execute(ctx, resource.DeleteCommand{
+		ReqID:   "asset-del",
+		ResType: resource.TypeAsset,
+		ID:      assetID,
+		Version: 1,
+	}, resource.Context{ActorUserID: actor}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reads.AssetItem(ctx, actor, resultID(t, items[0])); !isNotFound(err) {
+		t.Fatalf("asset item should be cascade-deleted, got %v", err)
 	}
 
 	image, err := svc.Execute(ctx, resource.CreateCommand{
@@ -197,12 +250,13 @@ func TestContentCommandPipeline(t *testing.T) {
 	if got["prompt"] != "雨夜" || got["version"] != int32(0) {
 		t.Fatalf("image read %+v", got)
 	}
-	if _, err := svc.Execute(ctx, resource.DeleteCommand{
-		ReqID:   "img-del",
-		ResType: resource.TypeImageTask,
-		ID:      imageID,
-		Version: 0,
-	}, resource.Context{ActorUserID: actor}); err != nil {
+	if err := reads.DeleteImageTask(ctx, actor, imageID); !isConflict(err) {
+		t.Fatalf("queued image task must not be deleted, got %v", err)
+	}
+	if _, err := db.Exec(`UPDATE afv_image_task SET status = 2 WHERE id = ?`, imageID); err != nil {
+		t.Fatal(err)
+	}
+	if err := reads.DeleteImageTask(ctx, actor, imageID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := reads.ImageTask(ctx, actor, publicID); !isNotFound(err) {

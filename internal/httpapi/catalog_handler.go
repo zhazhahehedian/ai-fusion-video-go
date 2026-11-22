@@ -37,10 +37,6 @@ func (d Deps) handleStoryboardUpdate(w http.ResponseWriter, r *http.Request) {
 	d.handleResourcePatch(w, r, resource.TypeStoryboard)
 }
 
-func (d Deps) handleStoryboardDelete(w http.ResponseWriter, r *http.Request) {
-	d.handleResourceDelete(w, r, resource.TypeStoryboard)
-}
-
 func (d Deps) handleStoryboardEpisodes(w http.ResponseWriter, r *http.Request) {
 	d.readID(w, r, "storyboardId", func(actor, id int64) (any, error) {
 		return d.Content.StoryboardEpisodes(r.Context(), actor, id)
@@ -263,7 +259,7 @@ func (d Deps) handleImageTaskUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d Deps) handleImageTaskDelete(w http.ResponseWriter, r *http.Request) {
-	d.handleResourceDelete(w, r, resource.TypeImageTask)
+	d.deleteGenerationTask(w, r, true)
 }
 
 func (d Deps) handleImageTaskGet(w http.ResponseWriter, r *http.Request) {
@@ -304,7 +300,30 @@ func (d Deps) handleVideoTaskUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d Deps) handleVideoTaskDelete(w http.ResponseWriter, r *http.Request) {
-	d.handleResourceDelete(w, r, resource.TypeVideoTask)
+	d.deleteGenerationTask(w, r, false)
+}
+
+func (d Deps) deleteGenerationTask(w http.ResponseWriter, r *http.Request, image bool) {
+	session, ok := auth.SessionFrom(r.Context())
+	if !ok {
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
+		return
+	}
+	id, err := pathID(r, "id")
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
+	if image {
+		err = d.Content.DeleteImageTask(r.Context(), session.UserID, id)
+	} else {
+		err = d.Content.DeleteVideoTask(r.Context(), session.UserID, id)
+	}
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
+	WriteOK(w, true)
 }
 
 func (d Deps) handleVideoTaskGet(w http.ResponseWriter, r *http.Request) {

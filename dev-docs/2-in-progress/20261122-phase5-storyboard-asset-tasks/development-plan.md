@@ -7,7 +7,8 @@
 | 能力 | 行为 |
 |---|---|
 | 迁移 `00006` | storyboard 四张表、asset / asset_item、image_task / image_item、video_task / video_item |
-| 命令 | 上述业务对象的 CREATE / PATCH / DELETE 走既有幂等、乐观锁、revision |
+| 命令 | 分镜、资产的增改删走既有幂等、乐观锁、revision。删除父对象时同事务级联软删子行，并为每个子行写 revision |
+| 任务删除 | 不要求 `version` / `requestId`；状态仅 2、3、4、6 可删 |
 | 读 | 权限检查后返回 camelCase JSON，分页 `{list,total}` |
 | 时钟 | 图片/视频任务及条目的写入使用 `UTC_TIMESTAMP()`；分镜和资产保持 `CURRENT_TIMESTAMP` |
 

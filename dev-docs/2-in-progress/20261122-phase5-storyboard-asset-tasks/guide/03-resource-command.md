@@ -70,7 +70,7 @@ WHERE resource_type = ? AND resource_id = ?
 
 Java `ResourceCommandService` 同样是 admit、锁命令、比对哈希、授权、应用、写 revision。分镜和资产的允许字段跟 `StoryboardFields`、`AssetFields` 对齐：例如分镜补丁不能改 `title` 和 `sortOrder`，排序只在创建时给出；镜头时长 0 到 86400 秒、最多两位小数；资产类型限定在 character/scene/prop 等九种。
 
-Java 的图片、视频任务不走这条命令管道，删除也不带版本。Go 为了和剧本、分镜共用幂等与 revision，删除 `DELETE /api/generation/image/{id}?version=&requestId=` 必须带这两项。返回值仍是 `true`，和 Java 的 `CommonResult<Boolean>` 一样。
+Java 的图片、视频任务删除不走这条命令管道，前端也不带 `version` 或 `requestId`。Go 同样把 `DELETE /api/generation/image/{id}` 和 video 放在命令管道之外：只检查任务已结束，然后在一个事务里软删条目和任务。创建和修改任务仍然走命令管道。
 
 Go 还没有 resource event、画布投递和团队 ACL。授权只锁“个人拥有的项目”。
 

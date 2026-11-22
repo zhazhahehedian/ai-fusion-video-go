@@ -178,60 +178,6 @@ func (ImageTaskPatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource
 	return patched(resource.TypeImageTask, saved.ID, projectID, version+1, changed, before, resource.ImageTaskVO(saved, version+1))
 }
 
-type ImageTaskDelete struct{}
-
-func (ImageTaskDelete) ResourceType() resource.Type   { return resource.TypeImageTask }
-func (ImageTaskDelete) Operation() resource.Operation { return resource.OpDelete }
-
-func (ImageTaskDelete) Authorize(ctx context.Context, q *sqlcdb.Queries, cmd resource.Command, actorUserID int64, _ *resource.Receipt) (*int64, error) {
-	del, err := asDelete(cmd)
-	if err != nil {
-		return nil, err
-	}
-	row, err := q.GetImageTaskByID(ctx, del.ID)
-	if err != nil {
-		return nil, missing(err, "生图任务不存在")
-	}
-	if row.UserID != actorUserID {
-		return nil, apperr.Forbidden("无权访问该任务")
-	}
-	return optionalProject(ctx, q, row.ProjectID, actorUserID)
-}
-
-func (ImageTaskDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.Command, _ int64) (resource.Mutation, error) {
-	del, err := asDelete(cmd)
-	if err != nil {
-		return resource.Mutation{}, err
-	}
-	row, err := q.LockImageTaskByID(ctx, del.ID)
-	if err != nil {
-		return resource.Mutation{}, missing(err, "生图任务不存在")
-	}
-	version, err := taskVersion(ctx, q, resource.TypeImageTask, row.ID)
-	if err != nil {
-		return resource.Mutation{}, err
-	}
-	if version != del.Version {
-		return resource.Mutation{}, apperr.Conflict("生图任务版本已变化，请刷新后重试")
-	}
-	n, err := q.SoftDeleteImageTask(ctx, row.ID)
-	if err != nil {
-		return resource.Mutation{}, err
-	}
-	if err := oneRow(n, "生图任务版本已变化，请刷新后重试"); err != nil {
-		return resource.Mutation{}, err
-	}
-	if err := q.SoftDeleteImageItemsByTask(ctx, row.ID); err != nil {
-		return resource.Mutation{}, err
-	}
-	var projectID int64
-	if row.ProjectID.Valid {
-		projectID = row.ProjectID.Int64
-	}
-	before := resource.ImageTaskVO(row, version)
-	return deleted(resource.TypeImageTask, row.ID, projectID, version+1, before, markDeleted(before, version+1))
-}
-
 type VideoTaskCreate struct{}
 
 func (VideoTaskCreate) ResourceType() resource.Type   { return resource.TypeVideoTask }
@@ -397,58 +343,4 @@ func (VideoTaskPatch) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource
 		projectID = saved.ProjectID.Int64
 	}
 	return patched(resource.TypeVideoTask, saved.ID, projectID, version+1, changed, before, resource.VideoTaskVO(saved, version+1))
-}
-
-type VideoTaskDelete struct{}
-
-func (VideoTaskDelete) ResourceType() resource.Type   { return resource.TypeVideoTask }
-func (VideoTaskDelete) Operation() resource.Operation { return resource.OpDelete }
-
-func (VideoTaskDelete) Authorize(ctx context.Context, q *sqlcdb.Queries, cmd resource.Command, actorUserID int64, _ *resource.Receipt) (*int64, error) {
-	del, err := asDelete(cmd)
-	if err != nil {
-		return nil, err
-	}
-	row, err := q.GetVideoTaskByID(ctx, del.ID)
-	if err != nil {
-		return nil, missing(err, "生视频任务不存在")
-	}
-	if row.UserID != actorUserID {
-		return nil, apperr.Forbidden("无权访问该任务")
-	}
-	return optionalProject(ctx, q, row.ProjectID, actorUserID)
-}
-
-func (VideoTaskDelete) Apply(ctx context.Context, q *sqlcdb.Queries, cmd resource.Command, _ int64) (resource.Mutation, error) {
-	del, err := asDelete(cmd)
-	if err != nil {
-		return resource.Mutation{}, err
-	}
-	row, err := q.LockVideoTaskByID(ctx, del.ID)
-	if err != nil {
-		return resource.Mutation{}, missing(err, "生视频任务不存在")
-	}
-	version, err := taskVersion(ctx, q, resource.TypeVideoTask, row.ID)
-	if err != nil {
-		return resource.Mutation{}, err
-	}
-	if version != del.Version {
-		return resource.Mutation{}, apperr.Conflict("生视频任务版本已变化，请刷新后重试")
-	}
-	n, err := q.SoftDeleteVideoTask(ctx, row.ID)
-	if err != nil {
-		return resource.Mutation{}, err
-	}
-	if err := oneRow(n, "生视频任务版本已变化，请刷新后重试"); err != nil {
-		return resource.Mutation{}, err
-	}
-	if err := q.SoftDeleteVideoItemsByTask(ctx, row.ID); err != nil {
-		return resource.Mutation{}, err
-	}
-	var projectID int64
-	if row.ProjectID.Valid {
-		projectID = row.ProjectID.Int64
-	}
-	before := resource.VideoTaskVO(row, version)
-	return deleted(resource.TypeVideoTask, row.ID, projectID, version+1, before, markDeleted(before, version+1))
 }

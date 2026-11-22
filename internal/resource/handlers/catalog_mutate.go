@@ -157,25 +157,59 @@ func patched(res resource.Type, id, projectID int64, version int32, fields []str
 }
 
 func deleted(res resource.Type, id, projectID int64, version int32, before, after any) (resource.Mutation, error) {
-	eventID, err := resource.NewEventID()
+	change, err := deleteChange(res, id, projectID, version, before, after, []string{"deleted"})
 	if err != nil {
 		return resource.Mutation{}, err
 	}
 	return resource.Mutation{
-		Result: true,
-		Changes: []resource.Change{{
-			EventID:       eventID,
-			ResourceType:  res,
-			ResourceID:    id,
-			ProjectID:     projectPtr(projectID),
-			Version:       version,
-			Deleted:       true,
-			ChangedFields: []string{"deleted"},
-			Before:        before,
-			After:         after,
-		}},
+		Result:         true,
+		Changes:        []resource.Change{change},
 		PreviousValues: before,
 	}, nil
+}
+
+func deleteChange(res resource.Type, id, projectID int64, version int32, before, after any, fields []string) (resource.Change, error) {
+	eventID, err := resource.NewEventID()
+	if err != nil {
+		return resource.Change{}, err
+	}
+	if fields == nil {
+		fields = []string{"deleted"}
+	}
+	return resource.Change{
+		EventID:       eventID,
+		ResourceType:  res,
+		ResourceID:    id,
+		ProjectID:     projectPtr(projectID),
+		Version:       version,
+		Deleted:       true,
+		ChangedFields: fields,
+		Before:        before,
+		After:         after,
+	}, nil
+}
+
+func assetChange(id, projectID int64, version int32, fields []string, before, after any) (resource.Change, error) {
+	eventID, err := resource.NewEventID()
+	if err != nil {
+		return resource.Change{}, err
+	}
+	return resource.Change{
+		EventID:       eventID,
+		ResourceType:  resource.TypeAsset,
+		ResourceID:    id,
+		ProjectID:     projectPtr(projectID),
+		Version:       version,
+		Deleted:       false,
+		ChangedFields: fields,
+		Before:        before,
+		After:         after,
+	}, nil
+}
+
+// coverMatches 对齐 Java detachItem：子资产图片与主资产封面是同一非空地址时清空封面。
+func coverMatches(imageURL, coverURL sql.NullString) bool {
+	return imageURL.Valid && coverURL.Valid && imageURL.String != "" && imageURL.String == coverURL.String
 }
 
 func markDeleted(vo map[string]any, version int32) map[string]any {

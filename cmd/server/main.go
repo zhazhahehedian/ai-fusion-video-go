@@ -68,7 +68,6 @@ func run(logOut io.Writer) int {
 		handlers.ScriptSceneDelete{},
 		handlers.StoryboardCreate{},
 		handlers.StoryboardPatch{},
-		handlers.StoryboardDelete{},
 		handlers.StoryboardEpisodeCreate{},
 		handlers.StoryboardEpisodePatch{},
 		handlers.StoryboardEpisodeDelete{},
@@ -86,10 +85,8 @@ func run(logOut io.Writer) int {
 		handlers.AssetItemDelete{},
 		handlers.ImageTaskCreate{},
 		handlers.ImageTaskPatch{},
-		handlers.ImageTaskDelete{},
 		handlers.VideoTaskCreate{},
 		handlers.VideoTaskPatch{},
-		handlers.VideoTaskDelete{},
 	)
 	if err != nil {
 		logger.Error("注册资源命令处理器失败", "err", err)

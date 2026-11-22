@@ -4,7 +4,7 @@
 |---|---|---|
 | 不提供 `POST /api/generation/image/submit` 与 video submit | 提交会创建受理记录并调用供应商 | 下一步把任务行接到租约队列，仍可不接真实 HTTP |
 | `image_item` / `video_item` 无独立增改命令 | 条目由生成 worker 写入；本阶段只建表、随任务删除做逻辑删除、提供按任务读取 | worker 成功后插入条目并维护 `success_count` |
-| 不级联删除分镜树和资产树 | Java 的 `clearContent` / batch 是单独命令 | 删除父对象前必须先删子对象，否则返回冲突 |
+| 无 `clearContent` | 删除分镜集/场次/主资产已经级联软删；清空并保留分镜文档是另一条命令 | `POST /api/storyboard/{id}/clearContent` 与分集清空 |
 | 无合成视频、配乐回写、`statistics`、`children`、`batch` | 依赖媒体作业或另一套批量命令 | 媒体写回阶段 |
 | 无 `GET /api/asset/metadata/{type}` 与 `/all`、`/batch` | 元数据是产品字段字典，不是表结构；分页全库与批量创建会扩大权限面 | 字典与批量命令单独做 |
 | `model_id`、`workflow_version_id` 不校验存在性 | 本库还没有 `afv_ai_model` / ComfyUI 工作流表 | 引入模型表后再校验 |

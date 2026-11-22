@@ -116,6 +116,31 @@ SELECT * FROM afv_storyboard_scene
 WHERE episode_id = ? AND IFNULL(deleted, 0) = 0
 ORDER BY sort_order ASC, id ASC;
 
+-- name: LockStoryboardScenesByEpisode :many
+SELECT * FROM afv_storyboard_scene
+WHERE episode_id = ? AND IFNULL(deleted, 0) = 0
+ORDER BY id ASC
+FOR UPDATE;
+
+-- name: LockStoryboardItemsByScene :many
+SELECT * FROM afv_storyboard_item
+WHERE storyboard_scene_id = ? AND deleted = 0
+ORDER BY id ASC
+FOR UPDATE;
+
+-- name: LockStoryboardItemsByEpisode :many
+SELECT * FROM afv_storyboard_item
+WHERE deleted = 0
+  AND (
+    storyboard_episode_id = ?
+    OR storyboard_scene_id IN (
+      SELECT id FROM afv_storyboard_scene
+      WHERE episode_id = ? AND IFNULL(deleted, 0) = 0
+    )
+  )
+ORDER BY id ASC
+FOR UPDATE;
+
 -- name: ListStoryboardScenesByBoard :many
 SELECT * FROM afv_storyboard_scene
 WHERE storyboard_id = ? AND IFNULL(deleted, 0) = 0

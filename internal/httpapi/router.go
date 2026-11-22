@@ -98,7 +98,6 @@ func NewRouter(deps Deps) http.Handler {
 		pr.Get("/api/storyboard/{id}", deps.handleStoryboardGet)
 		pr.Post("/api/storyboard", deps.handleStoryboardCreate)
 		pr.Put("/api/storyboard", deps.handleStoryboardUpdate)
-		pr.Delete("/api/storyboard/{id}", deps.handleStoryboardDelete)
 
 		pr.Get("/api/asset/list", deps.handleAssetList)
 		pr.Get("/api/asset/list-with-items", deps.handleAssetListWithItems)

@@ -26,20 +26,21 @@
 | 方法与路径 | 资源 | 说明 |
 |---|---|---|
 | `POST /api/storyboard` | storyboard | body：`requestId`、`projectId`、`fields` |
-| `PUT /api/storyboard` | storyboard | `id`、`version`、`requestId`、`patch` |
-| `DELETE /api/storyboard/{id}` | storyboard | 查询参数 `version`、`requestId`；有分集时冲突 |
-| `POST/PUT/DELETE /api/storyboard/episode` | storyboardEpisode | 创建要 `episodeNumber` 和父版本 |
+| `PUT /api/storyboard` | storyboard | `id`、`version`、`requestId`、`patch`。没有删除分镜文档的接口 |
+| `POST/PUT/DELETE /api/storyboard/episode` | storyboardEpisode | 创建要 `episodeNumber` 和父版本。删除会级联软删镜头和场次 |
 | `PUT /api/storyboard/episode/{id}/bindScriptEpisode` | storyboardEpisode | patch 只能有 `scriptEpisodeId` |
-| `POST/PUT/DELETE /api/storyboard/scene` | storyboardScene | 父对象是分镜集 |
+| `POST/PUT/DELETE /api/storyboard/scene` | storyboardScene | 父对象是分镜集。删除会先软删镜头 |
 | `POST/PUT/DELETE /api/storyboard/item` | shot | 父对象是场次。Java 类型名是 shot |
 | `PUT /api/storyboard/item/{id}/updateFrame` | shot | `frameType` 为 first 或 last，转成首帧/尾帧字段 |
-| `POST/PUT/DELETE /api/asset` 与 `/api/asset/item` | asset、assetItem | 子资产要父版本 |
-| `POST/PUT /api/generation/image` 与 video | imageTask、videoTask | 创建只落排队中的任务行 |
-| `DELETE /api/generation/image/{id}` 与 video | 同上 | 同时逻辑删除条目 |
+| `POST/PUT/DELETE /api/asset` 与 `/api/asset/item` | asset、assetItem | 子资产要父版本。删除主资产会先软删全部子资产；删除子资产时若图片是封面则清空封面 |
+| `POST/PUT /api/generation/image` 与 video | imageTask、videoTask | 创建和修改走命令管道，创建只落排队中的任务行 |
+| `DELETE /api/generation/image/{id}` 与 video | 同上 | 不带 `version` / `requestId`。状态须为 2、3、4、6，否则 409；先软删条目再软删任务 |
 
 创建子对象的 body 与剧本分集相同：`parentId`、`parentVersion`、`requestId`、`fields`。父 id 由路由放进 fields，调用方不能在 fields 里再写一遍。
 
-删除父对象不会级联。有子行时返回冲突。这和还没做的 `clearContent` 是分开的。
+删除分镜集时，同一事务里先软删镜头，再软删场次，最后软删分集并写 `deleted_id`。删除场次时先软删镜头。删除主资产时先软删全部子资产。每一个被软删的子行都写一条 revision。删子资产时，若图片地址与主资产封面相同，封面被清空，主资产版本加一。剧本删除分集时同样为每个场次写 revision。
+
+没有 `DELETE /api/storyboard/{id}`。Java 不删除分镜文档本身；清空整棵树的 `clearContent` 还没做。
 
 ## 读接口
 
@@ -83,12 +84,13 @@ flowchart TD
 - `compose-video`、`clearContent`、`/children`、`/batch`、`/statistics`。
 - `GET /api/asset/metadata/{assetType}`、`/all`、`/batch`。元数据是代码里的字段字典；`/all` 的分页协议和 `/list` 不同。
 
-Java 删除图片任务不带版本。Go 要求 `version` 和 `requestId`，以便进入命令管道。
+图片和视频任务的删除与 Java 一样不走资源命令，因此不要求 `version` 或 `requestId`。前端 `deleteImage` / `deleteVideo` 只传数字 id。状态不是 2、3、4、6 时返回 409，文案分别是「请等待图片生成结束后再删除记录」和「请等待视频生成结束后再删除记录」。
 
 ## 常见坑
 
 - 用数字主键调用 `GET /api/generation/image/{taskId}`。这条路径匹配的是公开 `taskId` 字符串。条目路径才是数字 id。
-- 删除还有子节点的分镜或资产，期望级联。现在会 409。
+- 调用 `DELETE /api/storyboard/{id}`。这个路由不存在；清空整棵分镜要等 `clearContent`。
+- 在任务仍是排队或处理中时删除它。会得到 409，而不是把条目一起删掉。
 - 在补丁里传 `sortOrder`。分镜树的排序只在创建时接受；子资产允许改 `sortOrder`。
 - 新建任务时自己传 `status: 2`。创建会拒绝，状态固定为排队中。补丁可以改 0 到 3，但这只改数据，不会启动 worker。
 - 指望 `modelId` 不存在时返回 404。模型表还没建，id 只是存下来。
