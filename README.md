@@ -40,4 +40,4 @@ curl -s http://127.0.0.1:18080/healthz
 
 `/healthz` 会探活 MySQL 与 Redis。
 
-当前进度：阶段4异步生成任务进行中；阶段5已补充分镜、资产、图片/视频任务的数据层。讲解见 `dev-docs/2-in-progress/20261122-phase5-storyboard-asset-tasks/guide/`。
+当前进度：阶段4异步生成与阶段5分镜/资产数据层已落地。阶段6把图片、视频提交接到任务行和 stub 写回，仍不调用真实供应商。讲解见 `dev-docs/guide/`，本次对照见 `dev-docs/2-in-progress/20261123-phase6-generation-submit/guide/`。

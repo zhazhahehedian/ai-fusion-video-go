@@ -7,7 +7,7 @@
 | [01 进程与 HTTP](01-process-and-http.md) | chi、超时、请求体上限、成功响应 |
 | [02 会话](02-session.md) | Redis token，以及还没做的注册门禁 |
 | [03 资源命令](03-resource-command.md) | 幂等、修订、字段顺序、清空与原文替换 |
-| [04 作业队列](04-lease-queue.md) | 租约、截止时间、执行身份、额度 |
+| [04 作业队列](04-lease-queue.md) | 租约、截止时间、执行身份、额度、图片视频写回 |
 | [05 时间](05-time.md) | 作业 UTC 与内容表会话时间 |
 | [06 外部进程](06-process-runner.md) | 输出上限与杀进程后的等待 |
 

@@ -11,6 +11,51 @@ import (
 	"encoding/json"
 )
 
+const completeImageTaskStub = `-- name: CompleteImageTaskStub :execrows
+UPDATE afv_image_task
+SET success_count = ?,
+    status = 2,
+    error_msg = NULL,
+    update_time = UTC_TIMESTAMP()
+WHERE id = ? AND deleted = 0 AND status IN (0, 1)
+`
+
+type CompleteImageTaskStubParams struct {
+	SuccessCount sql.NullInt32 `json:"success_count"`
+	ID           int64         `json:"id"`
+}
+
+// 一次提交只对应一个远端作业，成功数等于该作业写回的条目数。
+func (q *Queries) CompleteImageTaskStub(ctx context.Context, arg CompleteImageTaskStubParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, completeImageTaskStub, arg.SuccessCount, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const completeVideoTaskStub = `-- name: CompleteVideoTaskStub :execrows
+UPDATE afv_video_task
+SET success_count = ?,
+    status = 2,
+    error_msg = NULL,
+    update_time = UTC_TIMESTAMP()
+WHERE id = ? AND deleted = 0 AND status IN (0, 1)
+`
+
+type CompleteVideoTaskStubParams struct {
+	SuccessCount sql.NullInt32 `json:"success_count"`
+	ID           int64         `json:"id"`
+}
+
+func (q *Queries) CompleteVideoTaskStub(ctx context.Context, arg CompleteVideoTaskStubParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, completeVideoTaskStub, arg.SuccessCount, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const countImageTasksByUser = `-- name: CountImageTasksByUser :one
 SELECT COUNT(*) FROM afv_image_task
 WHERE user_id = ? AND deleted = 0
@@ -173,6 +218,165 @@ func (q *Queries) CreateVideoTask(ctx context.Context, arg CreateVideoTaskParams
 		return 0, err
 	}
 	return result.LastInsertId()
+}
+
+const failImageItemsPending = `-- name: FailImageItemsPending :execrows
+UPDATE afv_image_item
+SET status = 2,
+    error_msg = ?,
+    update_time = UTC_TIMESTAMP()
+WHERE task_id = ? AND deleted = 0 AND status = 0
+`
+
+type FailImageItemsPendingParams struct {
+	ErrorMsg sql.NullString `json:"error_msg"`
+	TaskID   int64          `json:"task_id"`
+}
+
+func (q *Queries) FailImageItemsPending(ctx context.Context, arg FailImageItemsPendingParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, failImageItemsPending, arg.ErrorMsg, arg.TaskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const failImageTaskOpen = `-- name: FailImageTaskOpen :execrows
+UPDATE afv_image_task
+SET status = 3,
+    error_msg = ?,
+    update_time = UTC_TIMESTAMP()
+WHERE id = ? AND deleted = 0 AND status IN (0, 1)
+`
+
+type FailImageTaskOpenParams struct {
+	ErrorMsg sql.NullString `json:"error_msg"`
+	ID       int64          `json:"id"`
+}
+
+func (q *Queries) FailImageTaskOpen(ctx context.Context, arg FailImageTaskOpenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, failImageTaskOpen, arg.ErrorMsg, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const failVideoItemsPending = `-- name: FailVideoItemsPending :execrows
+UPDATE afv_video_item
+SET status = 2,
+    error_msg = ?,
+    update_time = UTC_TIMESTAMP()
+WHERE task_id = ? AND deleted = 0 AND status = 0
+`
+
+type FailVideoItemsPendingParams struct {
+	ErrorMsg sql.NullString `json:"error_msg"`
+	TaskID   int64          `json:"task_id"`
+}
+
+func (q *Queries) FailVideoItemsPending(ctx context.Context, arg FailVideoItemsPendingParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, failVideoItemsPending, arg.ErrorMsg, arg.TaskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const failVideoTaskOpen = `-- name: FailVideoTaskOpen :execrows
+UPDATE afv_video_task
+SET status = 3,
+    error_msg = ?,
+    update_time = UTC_TIMESTAMP()
+WHERE id = ? AND deleted = 0 AND status IN (0, 1)
+`
+
+type FailVideoTaskOpenParams struct {
+	ErrorMsg sql.NullString `json:"error_msg"`
+	ID       int64          `json:"id"`
+}
+
+func (q *Queries) FailVideoTaskOpen(ctx context.Context, arg FailVideoTaskOpenParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, failVideoTaskOpen, arg.ErrorMsg, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const finishImageItemStub = `-- name: FinishImageItemStub :execrows
+UPDATE afv_image_item
+SET platform_task_id = ?,
+    image_url = ?,
+    thumbnail_url = ?,
+    width = ?,
+    height = ?,
+    status = 1,
+    error_msg = NULL,
+    update_time = UTC_TIMESTAMP()
+WHERE id = ? AND task_id = ? AND deleted = 0 AND status = 0
+`
+
+type FinishImageItemStubParams struct {
+	PlatformTaskID sql.NullString `json:"platform_task_id"`
+	ImageUrl       sql.NullString `json:"image_url"`
+	ThumbnailUrl   sql.NullString `json:"thumbnail_url"`
+	Width          sql.NullInt32  `json:"width"`
+	Height         sql.NullInt32  `json:"height"`
+	ID             int64          `json:"id"`
+	TaskID         int64          `json:"task_id"`
+}
+
+func (q *Queries) FinishImageItemStub(ctx context.Context, arg FinishImageItemStubParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, finishImageItemStub,
+		arg.PlatformTaskID,
+		arg.ImageUrl,
+		arg.ThumbnailUrl,
+		arg.Width,
+		arg.Height,
+		arg.ID,
+		arg.TaskID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const finishVideoItemStub = `-- name: FinishVideoItemStub :execrows
+UPDATE afv_video_item
+SET platform_task_id = ?,
+    video_url = ?,
+    cover_url = ?,
+    duration = ?,
+    status = 1,
+    error_msg = NULL,
+    update_time = UTC_TIMESTAMP()
+WHERE id = ? AND task_id = ? AND deleted = 0 AND status = 0
+`
+
+type FinishVideoItemStubParams struct {
+	PlatformTaskID sql.NullString `json:"platform_task_id"`
+	VideoUrl       sql.NullString `json:"video_url"`
+	CoverUrl       sql.NullString `json:"cover_url"`
+	Duration       sql.NullInt32  `json:"duration"`
+	ID             int64          `json:"id"`
+	TaskID         int64          `json:"task_id"`
+}
+
+func (q *Queries) FinishVideoItemStub(ctx context.Context, arg FinishVideoItemStubParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, finishVideoItemStub,
+		arg.PlatformTaskID,
+		arg.VideoUrl,
+		arg.CoverUrl,
+		arg.Duration,
+		arg.ID,
+		arg.TaskID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getImageTaskByID = `-- name: GetImageTaskByID :one
@@ -367,6 +571,38 @@ func (q *Queries) GetVideoTaskByPublicID(ctx context.Context, taskID string) (Af
 	return i, err
 }
 
+const insertImageItemPending = `-- name: InsertImageItemPending :execlastid
+INSERT INTO afv_image_item (
+  task_id, status, deleted, create_time, update_time
+) VALUES (
+  ?, 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP()
+)
+`
+
+func (q *Queries) InsertImageItemPending(ctx context.Context, taskID int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, insertImageItemPending, taskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
+const insertVideoItemPending = `-- name: InsertVideoItemPending :execlastid
+INSERT INTO afv_video_item (
+  task_id, status, deleted, create_time, update_time
+) VALUES (
+  ?, 0, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP()
+)
+`
+
+func (q *Queries) InsertVideoItemPending(ctx context.Context, taskID int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, insertVideoItemPending, taskID)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
+}
+
 const listImageItemsByTask = `-- name: ListImageItemsByTask :many
 SELECT id, task_id, platform_task_id, image_url, thumbnail_url, width, height, file_size, status, error_msg, deleted, create_time, update_time FROM afv_image_item
 WHERE task_id = ? AND deleted = 0
@@ -550,6 +786,36 @@ func (q *Queries) LockVideoTaskByID(ctx context.Context, id int64) (AfvVideoTask
 		&i.UpdateTime,
 	)
 	return i, err
+}
+
+const markImageTaskProcessing = `-- name: MarkImageTaskProcessing :execrows
+UPDATE afv_image_task
+SET status = 1,
+    update_time = UTC_TIMESTAMP()
+WHERE id = ? AND deleted = 0 AND status IN (0, 1)
+`
+
+func (q *Queries) MarkImageTaskProcessing(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markImageTaskProcessing, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const markVideoTaskProcessing = `-- name: MarkVideoTaskProcessing :execrows
+UPDATE afv_video_task
+SET status = 1,
+    update_time = UTC_TIMESTAMP()
+WHERE id = ? AND deleted = 0 AND status IN (0, 1)
+`
+
+func (q *Queries) MarkVideoTaskProcessing(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markVideoTaskProcessing, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const pageImageTasksByUser = `-- name: PageImageTasksByUser :many

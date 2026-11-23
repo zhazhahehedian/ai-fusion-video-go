@@ -6,7 +6,9 @@ import (
 )
 
 const (
-	KindEcho = "ECHO"
+	KindEcho  = "ECHO"
+	KindImage = "IMAGE"
+	KindVideo = "VIDEO"
 
 	StateQueued            = "QUEUED"
 	StateReady             = "READY"

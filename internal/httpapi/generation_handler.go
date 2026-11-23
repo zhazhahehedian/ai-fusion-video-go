@@ -55,3 +55,43 @@ func (d Deps) handleGenerationSubmissionGet(w http.ResponseWriter, r *http.Reque
 	}
 	WriteOK(w, view)
 }
+
+func (d Deps) handleImageSubmit(w http.ResponseWriter, r *http.Request) {
+	d.handleGenerationSubmit(w, r, true)
+}
+
+func (d Deps) handleVideoSubmit(w http.ResponseWriter, r *http.Request) {
+	d.handleGenerationSubmit(w, r, false)
+}
+
+func (d Deps) handleGenerationSubmit(w http.ResponseWriter, r *http.Request, image bool) {
+	session, ok := auth.SessionFrom(r.Context())
+	if !ok {
+		WriteError(w, r, apperr.Unauthorized("未登录或登录已过期"))
+		return
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	var publicID string
+	var err error
+	if image {
+		var req generation.ImageSubmitRequest
+		if err = dec.Decode(&req); err != nil {
+			WriteError(w, r, apperr.BadRequest("请求体无效"))
+			return
+		}
+		publicID, err = d.Generation.EnqueueImage(r.Context(), session.UserID, req)
+	} else {
+		var req generation.VideoSubmitRequest
+		if err = dec.Decode(&req); err != nil {
+			WriteError(w, r, apperr.BadRequest("请求体无效"))
+			return
+		}
+		publicID, err = d.Generation.EnqueueVideo(r.Context(), session.UserID, req)
+	}
+	if err != nil {
+		WriteError(w, r, err)
+		return
+	}
+	WriteOK(w, publicID)
+}

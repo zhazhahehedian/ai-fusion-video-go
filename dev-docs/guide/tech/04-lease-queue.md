@@ -33,3 +33,11 @@
 同一用户同时持有的远程作业许可仍是常量 `MaxUserRemoteJobs = 8`。Java 按 `ai_model` 的容量判断。模型表和真实供应商都不在这次范围内，所以没有做「读不到就按 8」的开关。echo 受理的模型快照也没有容量字段。
 
 `INGESTING` 不占新的许可，这和 Java `needsPermit` 一致。
+
+## 图片与视频提交的写回
+
+`POST /api/generation/image/submit` 与 `POST /api/generation/video/submit` 在同一个事务里写入业务任务、状态为 0 的条目、受理记录和一条远端作业。幂等冲突时回滚刚插入的任务行，避免留下没有受理的任务。
+
+工作者在准备阶段把任务改成 1。stub 成功后把条目改成 1，地址是 `stub://image/...` 或 `stub://video/...`，任务改成 2，`success_count` 等于这次提交的条目数。准备阶段就被截止时间或身份检查停掉时，任务改成 3，仍在生成中的条目改成 2。
+
+领取作业时 `result_json` 还是空的。`database/sql` 不能把 SQL NULL 扫进 `json.RawMessage`，所以查询用 `COALESCE(result_json, CAST('null' AS JSON))`。空结果读出来是 JSON `null`，不是缺列。

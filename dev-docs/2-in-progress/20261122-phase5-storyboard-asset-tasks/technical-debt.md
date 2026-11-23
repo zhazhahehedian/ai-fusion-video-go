@@ -4,8 +4,7 @@
 
 | 项 | 原因 |
 |---|---|
-| 不提供图片/视频 `submit` | 提交会创建受理并调用供应商。任务行的增删改查已经单独存在 |
-| `image_item` / `video_item` 无独立增改，也还不会在生成成功后插入 | 条目应由生成 worker 写入并维护 `success_count`。现在没有真实完成写回 |
+| 图片/视频 submit 不调用供应商 | 阶段6已创建任务、条目和受理，完成时写 `stub://` 地址。真实供应商、取消和 execution 查询仍未做 |
 | 无合成视频、配乐回写、`statistics`、`children`、`batch` | 依赖媒体作业或另一套批量命令 |
 | 无资产元数据字典和资产批量接口 | 字典是产品字段目录，不是表；批量命令会扩大权限面 |
 | `model_id`、`workflow_version_id` 不校验存在性 | 本库没有 `afv_ai_model` 和 ComfyUI 工作流表 |

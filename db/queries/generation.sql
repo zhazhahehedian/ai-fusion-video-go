@@ -66,7 +66,7 @@ INSERT INTO afv_remote_generation_job (
 -- name: ListJobsBySubmissionID :many
 SELECT
   id, submission_id, item_id, item_index, model_id, actor_user_id, project_id,
-  state, phase, provider_task_id, active_attempt_id, input_json, result_json,
+  state, phase, provider_task_id, active_attempt_id, input_json, COALESCE(result_json, CAST('null' AS JSON)) AS result_json,
   cancel_requested, cancel_sent, permit_held, owner_instance_id, owner_epoch,
   lease_until, next_poll_at, deadline_at, poll_attempts, consecutive_errors,
   error_code, error_message, revision, created_at, updated_at
@@ -77,7 +77,7 @@ ORDER BY item_index ASC;
 -- name: GetRemoteGenerationJob :one
 SELECT
   id, submission_id, item_id, item_index, model_id, actor_user_id, project_id,
-  state, phase, provider_task_id, active_attempt_id, input_json, result_json,
+  state, phase, provider_task_id, active_attempt_id, input_json, COALESCE(result_json, CAST('null' AS JSON)) AS result_json,
   cancel_requested, cancel_sent, permit_held, owner_instance_id, owner_epoch,
   lease_until, next_poll_at, deadline_at, poll_attempts, consecutive_errors,
   error_code, error_message, revision, created_at, updated_at
@@ -129,7 +129,7 @@ WHERE id = ?
 -- name: SelectLeasedJobForUpdate :one
 SELECT
   id, submission_id, item_id, item_index, model_id, actor_user_id, project_id,
-  state, phase, provider_task_id, active_attempt_id, input_json, result_json,
+  state, phase, provider_task_id, active_attempt_id, input_json, COALESCE(result_json, CAST('null' AS JSON)) AS result_json,
   cancel_requested, cancel_sent, permit_held, owner_instance_id, owner_epoch,
   lease_until, next_poll_at, deadline_at, poll_attempts, consecutive_errors,
   error_code, error_message, revision, created_at, updated_at
