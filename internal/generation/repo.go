@@ -262,6 +262,9 @@ func (r *Repository) Fail(ctx context.Context, claim Claim, state, code, message
 		}); err != nil {
 			return err
 		}
+		if err := closeLinkedTask(ctx, q, job.SubmissionID, message); err != nil {
+			return err
+		}
 		_, err = q.UpdateGenerationSubmissionState(ctx, sqlcdb.UpdateGenerationSubmissionStateParams{
 			State: state,
 			ID:    job.SubmissionID,

@@ -684,6 +684,11 @@ func applyAssetItemFields(row *sqlcdb.AfvAssetItem, fields map[string]any, creat
 	return changed, nil
 }
 
+// ApplyImageTaskFields 校验并写入生图任务字段。资源命令和生成提交共用这套规则。
+func ApplyImageTaskFields(row *sqlcdb.AfvImageTask, fields map[string]any, creating bool) ([]string, error) {
+	return applyImageTaskFields(row, fields, creating)
+}
+
 func applyImageTaskFields(row *sqlcdb.AfvImageTask, fields map[string]any, creating bool) ([]string, error) {
 	allowed := []string{
 		"prompt", "promptTemplateId", "refImageUrls", "ratio", "resolution", "aspectRatio",
@@ -789,6 +794,11 @@ func applyImageTaskFields(row *sqlcdb.AfvImageTask, fields map[string]any, creat
 		return nil, apperr.BadRequest("没有可更新的字段")
 	}
 	return changed, nil
+}
+
+// ApplyVideoTaskFields 校验并写入生视频任务字段。资源命令和生成提交共用这套规则。
+func ApplyVideoTaskFields(row *sqlcdb.AfvVideoTask, fields map[string]any, creating bool) ([]string, error) {
+	return applyVideoTaskFields(row, fields, creating)
 }
 
 func applyVideoTaskFields(row *sqlcdb.AfvVideoTask, fields map[string]any, creating bool) ([]string, error) {

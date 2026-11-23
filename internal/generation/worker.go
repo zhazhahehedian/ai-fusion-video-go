@@ -128,6 +128,10 @@ func (w *Worker) execute(ctx context.Context, initial Job) error {
 	job := initial
 	claim := job.Claim()
 
+	sub, err := w.repo.LoadSubmission(ctx, job.SubmissionID)
+	if err != nil {
+		return err
+	}
 	permitted, err := w.repo.ExecutionPermitted(ctx, job.SubmissionID)
 	if err != nil {
 		return err
@@ -142,7 +146,7 @@ func (w *Worker) execute(ctx context.Context, initial Job) error {
 
 	switch job.Phase {
 	case PhaseNew, PhasePreparing:
-		return w.submitStub(ctx, claim, job)
+		return w.submitStub(ctx, claim, job, sub)
 	case PhaseSubmitting:
 		if job.ProviderTaskID == nil || *job.ProviderTaskID == "" {
 			return w.repo.Fail(ctx, claim, StateUnknownSubmission, "UNKNOWN_SUBMISSION",
@@ -150,7 +154,7 @@ func (w *Worker) execute(ctx context.Context, initial Job) error {
 		}
 		return w.repo.WaitForNextPoll(ctx, claim, 1, PhasePolling, nil, nil)
 	case PhasePolling, PhaseIngesting:
-		return w.finishStub(ctx, claim, job)
+		return w.finishStub(ctx, claim, job, sub)
 	default:
 		return w.repo.Fail(ctx, claim, StateFailed, "UNSUPPORTED_PHASE", "不支持的执行阶段: "+job.Phase)
 	}
@@ -180,13 +184,17 @@ func gateExecution(permitted, cancelRequested bool, phase string, now, deadline 
 	return false, "", "", ""
 }
 
-func (w *Worker) submitStub(ctx context.Context, claim Claim, job Job) error {
+func (w *Worker) submitStub(ctx context.Context, claim Claim, job Job, sub SubmissionRef) error {
 	attemptID := job.ActiveAttemptID
 	if attemptID == nil || *attemptID == "" {
 		id := newUUID()
 		attemptID = &id
+		provider := "echo-stub"
+		if linkedKind(sub.Kind) {
+			provider = "stub"
+		}
 		req, err := json.Marshal(map[string]any{
-			"provider": "echo-stub",
+			"provider": provider,
 			"input":    json.RawMessage(job.InputJSON),
 		})
 		if err != nil {
@@ -197,15 +205,27 @@ func (w *Worker) submitStub(ctx context.Context, claim Claim, job Job) error {
 		}
 	}
 
-	providerTaskID := "echo-" + job.ID
-	if err := w.repo.BeginSubmission(ctx, claim, *attemptID, providerTaskID); err != nil {
+	providerID := providerTaskID(sub.Kind, job.ID)
+	if err := w.repo.BeginSubmission(ctx, claim, *attemptID, providerID); err != nil {
 		return err
+	}
+	if linkedKind(sub.Kind) {
+		if err := w.repo.MarkTaskProcessing(ctx, sub.Kind, sub.TaskID); err != nil {
+			var ae *apperr.Error
+			if errors.As(err, &ae) {
+				return w.repo.Fail(ctx, claim, StateFailed, "TASK_NOT_OPEN", ae.Msg)
+			}
+			return err
+		}
 	}
 	// 释放租约，改为 WAITING；下次到点再 poll，不占线程。
 	return w.repo.WaitForNextPoll(ctx, claim, 1, PhasePolling, nil, nil)
 }
 
-func (w *Worker) finishStub(ctx context.Context, claim Claim, job Job) error {
+func (w *Worker) finishStub(ctx context.Context, claim Claim, job Job, sub SubmissionRef) error {
+	if linkedKind(sub.Kind) {
+		return w.repo.SucceedLinked(ctx, claim)
+	}
 	var prompt string
 	var input struct {
 		Prompt string `json:"prompt"`
